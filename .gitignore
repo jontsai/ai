@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# Local notes / scratch
+notes/
+tmp/
+
+# If you ever add logs
+*.log
