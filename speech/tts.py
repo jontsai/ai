@@ -18,6 +18,7 @@ import soundfile as sf
 SAMPLE_RATE = 24000
 DEFAULT_VOICE = "af_heart"
 DEFAULT_LANG = "en-us"
+DEFAULT_SPEED = 1.0
 
 # Backend selection: "onnx" (default) or "native"
 TTS_BACKEND = os.environ.get("TTS_BACKEND", "onnx")
@@ -53,10 +54,10 @@ def _get_onnx_instance():
     return _onnx_instance
 
 
-def _synthesize_onnx(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG):
+def _synthesize_onnx(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG, speed: float = DEFAULT_SPEED):
     """Synthesize speech using kokoro-onnx."""
     kokoro = _get_onnx_instance()
-    samples, sample_rate = kokoro.create(text, voice=voice, speed=1.0, lang=lang)
+    samples, sample_rate = kokoro.create(text, voice=voice, speed=speed, lang=lang)
     return np.asarray(samples, dtype=np.float32), sample_rate
 
 
@@ -73,11 +74,12 @@ def _get_native_pipeline():
     return _native_pipeline
 
 
-def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG):
+def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG, speed: float = DEFAULT_SPEED):
     """Synthesize speech using native kokoro (requires spacy)."""
     pipe = _get_native_pipeline()
     chunks = []
-    for _gs, _ps, audio in pipe(text, voice=voice):
+    # Note: native kokoro speed control may differ; this is a placeholder
+    for _gs, _ps, audio in pipe(text, voice=voice, speed=speed):
         chunks.append(audio)
     if chunks:
         return np.concatenate(chunks), SAMPLE_RATE
@@ -88,7 +90,7 @@ def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAUL
 # Public API
 # -----------------------------------------------------------------------------
 
-def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG):
+def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG, speed: float = DEFAULT_SPEED):
     """
     Synthesize speech from text.
 
@@ -96,29 +98,30 @@ def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG):
         text: The text to speak.
         voice: Voice ID (e.g., "af_heart", "af_sarah").
         lang: Language code (e.g., "en-us").
+        speed: Speed multiplier (0.5 = half, 2.0 = double).
 
     Returns:
         Tuple of (samples, sample_rate) where samples is a numpy array.
     """
     if TTS_BACKEND == "native":
-        return _synthesize_native(text, voice, lang)
+        return _synthesize_native(text, voice, lang, speed)
     else:
-        return _synthesize_onnx(text, voice, lang)
+        return _synthesize_onnx(text, voice, lang, speed)
 
 
-def pipeline(text: str, voice: str = DEFAULT_VOICE):
+def pipeline(text: str, voice: str = DEFAULT_VOICE, speed: float = DEFAULT_SPEED):
     """
     Generate audio chunks for the given text.
 
     This function exists for API compatibility with tests.
     Yields tuples of (graphemes, phonemes, audio_array).
     """
-    samples, _sr = synthesize(text, voice)
+    samples, _sr = synthesize(text, voice, speed=speed)
     # Yield as a single chunk to match the expected interface
     yield None, None, samples
 
 
-def tts_file(text_path: str, wav_path: str, voice: str = DEFAULT_VOICE) -> None:
+def tts_file(text_path: str, wav_path: str, voice: str = DEFAULT_VOICE, speed: float = DEFAULT_SPEED) -> None:
     """Convert text file to speech and save as WAV."""
     with open(text_path, "r", encoding="utf-8") as f:
         text = f.read().strip()
@@ -128,7 +131,7 @@ def tts_file(text_path: str, wav_path: str, voice: str = DEFAULT_VOICE) -> None:
 
     # Use pipeline() to allow test mocking
     chunks = []
-    for _gs, _ps, audio in pipeline(text, voice):
+    for _gs, _ps, audio in pipeline(text, voice, speed):
         chunks.append(audio)
 
     if chunks:
@@ -137,16 +140,17 @@ def tts_file(text_path: str, wav_path: str, voice: str = DEFAULT_VOICE) -> None:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        print("Usage: tts.py <input.txt> <output.wav>", file=sys.stderr)
-        return 2
-
-    text_path = sys.argv[1]
-    wav_path = sys.argv[2]
+    import argparse
+    parser = argparse.ArgumentParser(description="Text-to-Speech using Kokoro")
+    parser.add_argument("input", help="Input text file")
+    parser.add_argument("output", help="Output WAV file")
+    parser.add_argument("-v", "--voice", default=DEFAULT_VOICE, help=f"Voice ID (default: {DEFAULT_VOICE})")
+    parser.add_argument("-s", "--speed", type=float, default=DEFAULT_SPEED, help=f"Speed multiplier (default: {DEFAULT_SPEED})")
+    args = parser.parse_args()
 
     try:
-        tts_file(text_path, wav_path)
-        print(f"Wrote {wav_path}")
+        tts_file(args.input, args.output, voice=args.voice, speed=args.speed)
+        print(f"Wrote {args.output}")
         return 0
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)

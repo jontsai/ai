@@ -110,8 +110,8 @@ tts:
 	@./scripts/tts.sh
 
 say:
-	@# Speak text directly: make say TEXT="Hello world"
-	@./scripts/say.sh "$(TEXT)"
+	@# Speak text: make say TEXT="Hello" VOICE=bf_emma SPEED=1.2
+	@VOICE="$(or $(VOICE),af_heart)" SPEED="$(or $(SPEED),1.0)" ./scripts/say.sh "$(TEXT)"
 
 talk:
 	@# listen -> stt -> tts (one command)

@@ -2,7 +2,7 @@ import numpy as np
 import tts
 
 
-def fake_pipeline(text, voice):
+def fake_pipeline(text, voice, speed=1.0):
     # Yield the tuple shape your tts.py expects: (gs, ps, audio)
     # We'll return two small chunks.
     yield None, None, np.array([0.0, 0.1, 0.2], dtype=np.float32)
