@@ -3,17 +3,15 @@
 Interactive TTS voice demo.
 
 Controls:
-  j/n/Space/Enter/→ = Next voice
-  k/p/Backspace/←   = Previous voice
-  r                 = Replay current voice
-  q/Esc             = Quit
-  1-9               = Jump to voice by number
+  j/↓ = Next voice       k/↑ = Previous voice
+  Tab = Next language    Shift+Tab = Previous language
+  r = Replay             Space/Enter = Play current
+  q/Esc = Quit
 
-Audio auto-advances when finished. Press j/k to skip/go back.
+Audio auto-advances when finished.
 """
 import os
 import select
-import signal
 import subprocess
 import sys
 import tempfile
@@ -27,85 +25,92 @@ sys.path.insert(0, str(Path(__file__).parent))
 import numpy as np
 import soundfile as sf
 
-# Voice definitions: (voice_id, name, description, lang)
-VOICES = [
-    # American English - Female
-    ("af_alloy", "Alloy", "American female", "en-us"),
-    ("af_aoede", "Aoede", "American female", "en-us"),
-    ("af_bella", "Bella", "American female, warm/husky, conversational", "en-us"),
-    ("af_heart", "Heart", "American female (default)", "en-us"),
-    ("af_jessica", "Jessica", "American female", "en-us"),
-    ("af_kore", "Kore", "American female", "en-us"),
-    ("af_nicole", "Nicole", "American female, ASMR style", "en-us"),
-    ("af_nova", "Nova", "American female", "en-us"),
-    ("af_river", "River", "American female", "en-us"),
-    ("af_sarah", "Sarah", "American female", "en-us"),
-    ("af_sky", "Sky", "American female", "en-us"),
-    # American English - Male
-    ("am_adam", "Adam", "American male", "en-us"),
-    ("am_echo", "Echo", "American male", "en-us"),
-    ("am_eric", "Eric", "American male", "en-us"),
-    ("am_fenrir", "Fenrir", "American male", "en-us"),
-    ("am_liam", "Liam", "American male", "en-us"),
-    ("am_michael", "Michael", "American male", "en-us"),
-    ("am_onyx", "Onyx", "American male", "en-us"),
-    ("am_puck", "Puck", "American male", "en-us"),
-    ("am_santa", "Santa", "American male", "en-us"),
-    # British English - Female
-    ("bf_alice", "Alice", "British female", "en-gb"),
-    ("bf_emma", "Emma", "British female", "en-gb"),
-    ("bf_isabella", "Isabella", "British female", "en-gb"),
-    ("bf_lily", "Lily", "British female", "en-gb"),
-    # British English - Male
-    ("bm_daniel", "Daniel", "British male", "en-gb"),
-    ("bm_fable", "Fable", "British male", "en-gb"),
-    ("bm_george", "George", "British male", "en-gb"),
-    ("bm_lewis", "Lewis", "British male", "en-gb"),
-    # Japanese
-    ("jf_alpha", "Alpha", "日本語の女性", "ja"),
-    ("jf_gongitsune", "Gongitsune", "日本語の女性", "ja"),
-    ("jf_nezumi", "Nezumi", "日本語の女性", "ja"),
-    ("jf_tebukuro", "Tebukuro", "日本語の女性", "ja"),
-    ("jm_kumo", "Kumo", "日本語の男性", "ja"),
-    # Mandarin Chinese
-    ("zf_xiaobei", "Xiaobei", "中文女声", "zh"),
-    ("zf_xiaoni", "Xiaoni", "中文女声", "zh"),
-    ("zf_xiaoxiao", "Xiaoxiao", "中文女声", "zh"),
-    ("zf_xiaoyi", "Xiaoyi", "中文女声", "zh"),
-    ("zm_yunjian", "Yunjian", "中文男声", "zh"),
-    ("zm_yunxi", "Yunxi", "中文男声", "zh"),
-    ("zm_yunxia", "Yunxia", "中文男声", "zh"),
-    ("zm_yunyang", "Yunyang", "中文男声", "zh"),
-    # Spanish
-    ("ef_dora", "Dora", "una voz femenina española", "es"),
-    ("em_alex", "Alex", "una voz masculina española", "es"),
-    ("em_santa", "Santa", "una voz masculina española", "es"),
-    # French
-    ("ff_siwis", "Siwis", "une voix féminine française", "fr"),
-    # Hindi
-    ("hf_alpha", "Alpha", "एक हिंदी महिला", "hi"),
-    ("hf_beta", "Beta", "एक हिंदी महिला", "hi"),
-    ("hm_omega", "Omega", "एक हिंदी पुरुष", "hi"),
-    ("hm_psi", "Psi", "एक हिंदी पुरुष", "hi"),
-    # Italian
-    ("if_sara", "Sara", "una voce femminile italiana", "it"),
-    ("im_nicola", "Nicola", "una voce maschile italiana", "it"),
-    # Brazilian Portuguese
-    ("pf_dora", "Dora", "uma voz feminina brasileira", "pt-br"),
-    ("pm_alex", "Alex", "uma voz masculina brasileira", "pt-br"),
-    ("pm_santa", "Santa", "uma voz masculina brasileira", "pt-br"),
+# Voice definitions grouped by language
+LANGUAGES = [
+    ("American English", "en-us", [
+        ("af_alloy", "Alloy", "Female"),
+        ("af_aoede", "Aoede", "Female"),
+        ("af_bella", "Bella", "Female, warm/husky"),
+        ("af_heart", "Heart", "Female (default)"),
+        ("af_jessica", "Jessica", "Female"),
+        ("af_kore", "Kore", "Female"),
+        ("af_nicole", "Nicole", "Female, ASMR"),
+        ("af_nova", "Nova", "Female"),
+        ("af_river", "River", "Female"),
+        ("af_sarah", "Sarah", "Female"),
+        ("af_sky", "Sky", "Female"),
+        ("am_adam", "Adam", "Male"),
+        ("am_echo", "Echo", "Male"),
+        ("am_eric", "Eric", "Male"),
+        ("am_fenrir", "Fenrir", "Male"),
+        ("am_liam", "Liam", "Male"),
+        ("am_michael", "Michael", "Male"),
+        ("am_onyx", "Onyx", "Male"),
+        ("am_puck", "Puck", "Male"),
+        ("am_santa", "Santa", "Male"),
+    ]),
+    ("British English", "en-gb", [
+        ("bf_alice", "Alice", "Female"),
+        ("bf_emma", "Emma", "Female"),
+        ("bf_isabella", "Isabella", "Female"),
+        ("bf_lily", "Lily", "Female"),
+        ("bm_daniel", "Daniel", "Male"),
+        ("bm_fable", "Fable", "Male"),
+        ("bm_george", "George", "Male"),
+        ("bm_lewis", "Lewis", "Male"),
+    ]),
+    ("Japanese", "ja", [
+        ("jf_alpha", "Alpha", "女性"),
+        ("jf_gongitsune", "Gongitsune", "女性"),
+        ("jf_nezumi", "Nezumi", "女性"),
+        ("jf_tebukuro", "Tebukuro", "女性"),
+        ("jm_kumo", "Kumo", "男性"),
+    ]),
+    ("Chinese", "zh", [
+        ("zf_xiaobei", "Xiaobei", "女声"),
+        ("zf_xiaoni", "Xiaoni", "女声"),
+        ("zf_xiaoxiao", "Xiaoxiao", "女声"),
+        ("zf_xiaoyi", "Xiaoyi", "女声"),
+        ("zm_yunjian", "Yunjian", "男声"),
+        ("zm_yunxi", "Yunxi", "男声"),
+        ("zm_yunxia", "Yunxia", "男声"),
+        ("zm_yunyang", "Yunyang", "男声"),
+    ]),
+    ("Spanish", "es", [
+        ("ef_dora", "Dora", "Femenina"),
+        ("em_alex", "Alex", "Masculina"),
+        ("em_santa", "Santa", "Masculina"),
+    ]),
+    ("French", "fr", [
+        ("ff_siwis", "Siwis", "Féminine"),
+    ]),
+    ("Hindi", "hi", [
+        ("hf_alpha", "Alpha", "महिला"),
+        ("hf_beta", "Beta", "महिला"),
+        ("hm_omega", "Omega", "पुरुष"),
+        ("hm_psi", "Psi", "पुरुष"),
+    ]),
+    ("Italian", "it", [
+        ("if_sara", "Sara", "Femminile"),
+        ("im_nicola", "Nicola", "Maschile"),
+    ]),
+    ("Portuguese", "pt-br", [
+        ("pf_dora", "Dora", "Feminina"),
+        ("pm_alex", "Alex", "Masculina"),
+        ("pm_santa", "Santa", "Masculina"),
+    ]),
 ]
 
 GREETINGS = {
-    "en-us": "Hi! I'm {name}, {desc}. How can I help you today?",
-    "en-gb": "Hello! I'm {name}, {desc}. How may I assist you today?",
-    "ja": "こんにちは！私は{name}です、{desc}です。今日はどうお手伝いしましょうか？",
-    "zh": "你好！我是{name}，{desc}。今天我能帮您什么？",
-    "es": "¡Hola! Soy {name}, {desc}. ¿En qué puedo ayudarte hoy?",
-    "fr": "Bonjour! Je suis {name}, {desc}. Comment puis-je vous aider aujourd'hui?",
-    "hi": "नमस्ते! मैं {name} हूं, {desc}। आज मैं आपकी कैसे मदद कर सकती हूं?",
-    "it": "Ciao! Sono {name}, {desc}. Come posso aiutarti oggi?",
-    "pt-br": "Olá! Eu sou {name}, {desc}. Como posso ajudá-lo hoje?",
+    "en-us": "Hi! I'm {name}. How can I help you today?",
+    "en-gb": "Hello! I'm {name}. How may I assist you today?",
+    "ja": "こんにちは！私は{name}です。今日はどうお手伝いしましょうか？",
+    "zh": "你好！我是{name}。今天我能帮您什么？",
+    "es": "¡Hola! Soy {name}. ¿En qué puedo ayudarte hoy?",
+    "fr": "Bonjour! Je suis {name}. Comment puis-je vous aider?",
+    "hi": "नमस्ते! मैं {name} हूं। आज मैं आपकी कैसे मदद कर सकती हूं?",
+    "it": "Ciao! Sono {name}. Come posso aiutarti oggi?",
+    "pt-br": "Olá! Eu sou {name}. Como posso ajudá-lo hoje?",
 }
 
 
@@ -118,9 +123,7 @@ def get_key_nonblocking(timeout=0.1):
         rlist, _, _ = select.select([sys.stdin], [], [], timeout)
         if rlist:
             ch = sys.stdin.read(1)
-            # Handle escape sequences (arrow keys, etc.)
             if ch == '\x1b':
-                # Check if more chars available
                 rlist2, _, _ = select.select([sys.stdin], [], [], 0.05)
                 if rlist2:
                     ch += sys.stdin.read(2)
@@ -135,60 +138,11 @@ def stop_audio():
     subprocess.run(['killall', 'afplay'], stderr=subprocess.DEVNULL)
 
 
-def clear_line():
-    """Clear the current line."""
-    print('\r\033[K', end='', flush=True)
-
-
-def clear_screen():
-    """Clear screen and move cursor to top."""
-    print('\033[2J\033[H', end='', flush=True)
-
-
-def display_voice_list(voices, current_idx, visible=15):
-    """Display a scrolling list of voices with current highlighted."""
-    total = len(voices)
-
-    # Calculate visible window
-    half = visible // 2
-    start = max(0, current_idx - half)
-    end = min(total, start + visible)
-    if end == total:
-        start = max(0, end - visible)
-
-    clear_screen()
-    print("=" * 65)
-    print("  Kokoro TTS Voice Demo")
-    print("=" * 65)
-    print("  j/→ = Next   k/← = Prev   r = Replay   q = Quit   1-9 = Jump")
-    print("-" * 65)
-
-    for i in range(start, end):
-        voice_id, name, desc, lang = voices[i]
-        marker = "▶" if i == current_idx else " "
-        num = f"{i+1:2}"
-
-        # Truncate description if too long
-        max_desc = 35
-        if len(desc) > max_desc:
-            desc = desc[:max_desc-2] + ".."
-
-        # Highlight current voice
-        if i == current_idx:
-            print(f"\033[1;32m{marker} {num}. {voice_id:<15} {name:<12} {desc}\033[0m")
-        else:
-            print(f"{marker} {num}. {voice_id:<15} {name:<12} {desc}")
-
-    print("-" * 65)
-    print(f"  [{current_idx + 1}/{total}] Auto-advances when audio finishes")
-    print("=" * 65, flush=True)
-
-
-def generate_audio(voice_id: str, name: str, desc: str, lang: str) -> str:
+def generate_audio(voice_id: str, name: str, lang: str) -> str:
     """Generate TTS audio and return temp file path."""
     import tts
 
-    greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name, desc=desc)
+    greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name)
     samples, sample_rate = tts.synthesize(greeting, voice=voice_id)
 
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
@@ -203,11 +157,70 @@ def play_audio(wav_path: str) -> subprocess.Popen:
     return subprocess.Popen(['afplay', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def display(languages, lang_idx, voice_idx, played):
+    """Display the voice browser UI."""
+    print('\033[2J\033[H', end='')  # Clear screen
+
+    # Header
+    print("╔" + "═" * 63 + "╗")
+    print("║" + "  Kokoro TTS Voice Demo".center(63) + "║")
+    print("╠" + "═" * 63 + "╣")
+
+    # Language tabs
+    tabs = []
+    for i, (lang_name, _, voices) in enumerate(languages):
+        if i == lang_idx:
+            tabs.append(f"\033[1;32m[{lang_name}]\033[0m")
+        else:
+            tabs.append(f" {lang_name} ")
+
+    tab_line = " ".join(tabs)
+    # Truncate if too long
+    if len(tab_line) > 100:
+        tab_line = "  ".join([f"{'>' if i == lang_idx else ' '}{l[0][:3]}" for i, l in enumerate(languages)])
+
+    print("║ " + "Tab/Shift+Tab to switch languages".ljust(62) + "║")
+    print("╟" + "─" * 63 + "╢")
+
+    # Current language info
+    lang_name, lang_code, voices = languages[lang_idx]
+    print(f"║ \033[1m{lang_name}\033[0m ({len(voices)} voices)".ljust(72) + "║")
+    print("╟" + "─" * 63 + "╢")
+
+    # Voice list
+    for i, (vid, name, desc) in enumerate(voices):
+        key = (lang_idx, i)
+        if i == voice_idx:
+            marker = "\033[1;32m▶\033[0m"
+            line = f"\033[1;32m{vid:<15} {name:<12} {desc}\033[0m"
+        elif key in played:
+            marker = "✓"
+            line = f"\033[2m{vid:<15} {name:<12} {desc}\033[0m"
+        else:
+            marker = " "
+            line = f"{vid:<15} {name:<12} {desc}"
+
+        print(f"║ {marker} {line}".ljust(72) + "║")
+
+    # Pad to fill space
+    for _ in range(max(0, 12 - len(voices))):
+        print("║" + " " * 63 + "║")
+
+    # Footer
+    print("╟" + "─" * 63 + "╢")
+    print("║  j/↓ Next   k/↑ Prev   Tab Switch   r Replay   q Quit".ljust(64) + "║")
+    print("╚" + "═" * 63 + "╝")
+    sys.stdout.flush()
+
+
 def main():
-    idx = 0
-    total = len(VOICES)
+    lang_idx = 0
+    voice_idx = 0
+    played = set()  # Track played voices as (lang_idx, voice_idx)
     audio_proc = None
     tmp_path = None
+    pending_play = False  # Flag to play after navigation settles
+    idle_count = 0  # Count idle cycles to detect settling
 
     def cleanup():
         nonlocal audio_proc, tmp_path
@@ -218,62 +231,94 @@ def main():
             os.unlink(tmp_path)
             tmp_path = None
 
+    def play_current():
+        nonlocal audio_proc, tmp_path, pending_play
+        cleanup()
+        stop_audio()
+        pending_play = False
+
+        _, lang_code, voices = LANGUAGES[lang_idx]
+        voice_id, name, _ = voices[voice_idx]
+
+        played.add((lang_idx, voice_idx))
+        display(LANGUAGES, lang_idx, voice_idx, played)
+
+        tmp_path = generate_audio(voice_id, name, lang_code)
+        audio_proc = play_audio(tmp_path)
+
+    def navigate(new_lang_idx, new_voice_idx):
+        nonlocal lang_idx, voice_idx, pending_play, idle_count
+        stop_audio()
+        cleanup()
+        lang_idx = new_lang_idx
+        voice_idx = new_voice_idx
+        pending_play = True
+        idle_count = 0
+        display(LANGUAGES, lang_idx, voice_idx, played)
+
     try:
+        display(LANGUAGES, lang_idx, voice_idx, played)
+        play_current()
+
         while True:
-            voice_id, name, desc, lang = VOICES[idx]
+            key = get_key_nonblocking(timeout=0.05)  # Faster polling for responsive navigation
 
-            # Display voice list with current highlighted
-            display_voice_list(VOICES, idx)
+            # Check if audio finished (auto-advance)
+            if audio_proc and audio_proc.poll() is not None:
+                _, _, voices = LANGUAGES[lang_idx]
+                navigate(lang_idx, (voice_idx + 1) % len(voices))
+                pending_play = True
+                idle_count = 3  # Play immediately after audio ends
 
-            # Generate and play audio
-            cleanup()
-            stop_audio()
-            tmp_path = generate_audio(voice_id, name, desc, lang)
-            audio_proc = play_audio(tmp_path)
+            # If pending play and idle for a bit, start playing
+            if pending_play:
+                idle_count += 1
+                if idle_count > 3:  # ~150ms of no input
+                    play_current()
 
-            # Wait for input or audio to finish
-            while True:
-                key = get_key_nonblocking(timeout=0.1)
+            if key is None:
+                continue
 
-                # Check if audio finished (auto-advance)
-                if audio_proc and audio_proc.poll() is not None:
-                    idx = (idx + 1) % total
-                    break
+            idle_count = 0  # Reset on any key
+            _, _, voices = LANGUAGES[lang_idx]
 
-                if key is None:
-                    continue
+            if key in ('q', '\x03'):  # q, Ctrl+C
+                cleanup()
+                stop_audio()
+                print("\033[2J\033[H", end='')  # Clear screen
+                print("Done!")
+                return 0
 
-                if key in ('q', '\x1b', '\x03'):  # q, Esc, Ctrl+C
-                    cleanup()
-                    stop_audio()
-                    print("\n\nDone!")
-                    return 0
-                elif key in ('j', 'n', ' ', '\r', '\x1b[C'):  # j, n, Space, Enter, Right
-                    stop_audio()
-                    idx = (idx + 1) % total
-                    break
-                elif key in ('k', 'p', '\x7f', '\x1b[D'):  # k, p, Backspace, Left
-                    stop_audio()
-                    idx = (idx - 1) % total
-                    break
-                elif key == 'r':  # Replay
-                    stop_audio()
-                    break
-                elif key.isdigit() and key != '0':
-                    stop_audio()
-                    page_start = (idx // 9) * 9
-                    new_idx = page_start + int(key) - 1
-                    if new_idx < total:
-                        idx = new_idx
-                    break
+            elif key == '\x1b':  # Escape (might be arrow key)
+                pass  # Plain Esc - ignore
+
+            elif key == '\x1b[A' or key == 'k':  # Up, k
+                navigate(lang_idx, (voice_idx - 1) % len(voices))
+
+            elif key == '\x1b[B' or key == 'j':  # Down, j
+                navigate(lang_idx, (voice_idx + 1) % len(voices))
+
+            elif key == '\x1b[Z':  # Shift+Tab
+                new_lang = (lang_idx - 1) % len(LANGUAGES)
+                navigate(new_lang, 0)
+
+            elif key == '\t':  # Tab
+                new_lang = (lang_idx + 1) % len(LANGUAGES)
+                navigate(new_lang, 0)
+
+            elif key == 'r':  # Replay
+                play_current()
+
+            elif key in (' ', '\r'):  # Space, Enter - immediate play
+                play_current()
+
+    except KeyboardInterrupt:
+        pass
     finally:
         cleanup()
         stop_audio()
+        print("\033[2J\033[H", end='')
 
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except KeyboardInterrupt:
-        print("\n\nInterrupted!")
-        sys.exit(1)
+    sys.exit(main() or 0)
