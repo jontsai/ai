@@ -55,93 +55,94 @@ class ReadlineInput(Input):
 # Constants
 # =============================================================================
 
-DEFAULT_TEXT = "Hi! I'm {name}, {lang_name} {desc}. How can I help you today?"
+# Placeholders: {name}, {article}, {nationality}, {gender}, {notes}
+DEFAULT_TEXT = "Hi! I'm {name}, {article} {nationality} {gender}. How can I help you today?"
 
-LANG_NAMES = {
-    "en-us": "an American",
-    "en-gb": "a British",
-    "ja": "a Japanese",
-    "zh": "a Chinese",
-    "es": "a Spanish",
-    "fr": "a French",
-    "hi": "a Hindi",
-    "it": "an Italian",
-    "pt-br": "a Brazilian Portuguese",
+NATIONALITIES = {
+    "en-us": ("an", "American"),
+    "en-gb": ("a", "British"),
+    "ja": ("a", "Japanese"),
+    "zh": ("a", "Chinese"),
+    "es": ("a", "Spanish"),
+    "fr": ("a", "French"),
+    "hi": ("a", "Hindi"),
+    "it": ("an", "Italian"),
+    "pt-br": ("a", "Brazilian Portuguese"),
 }
 
-# Voice definitions: (lang_name, lang_code, [(voice_id, name, desc), ...])
+# Voice definitions: (lang_name, lang_code, [(voice_id, name, gender, notes), ...])
 LANGUAGES = [
     ("American English", "en-us", [
-        ("af_alloy", "Alloy", "Female"),
-        ("af_aoede", "Aoede", "Female"),
-        ("af_bella", "Bella", "Female, warm/husky"),
-        ("af_heart", "Heart", "Female (default)"),
-        ("af_jessica", "Jessica", "Female"),
-        ("af_kore", "Kore", "Female"),
-        ("af_nicole", "Nicole", "Female, ASMR"),
-        ("af_nova", "Nova", "Female"),
-        ("af_river", "River", "Female"),
-        ("af_sarah", "Sarah", "Female"),
-        ("af_sky", "Sky", "Female"),
-        ("am_adam", "Adam", "Male"),
-        ("am_echo", "Echo", "Male"),
-        ("am_eric", "Eric", "Male"),
-        ("am_fenrir", "Fenrir", "Male"),
-        ("am_liam", "Liam", "Male"),
-        ("am_michael", "Michael", "Male"),
-        ("am_onyx", "Onyx", "Male"),
-        ("am_puck", "Puck", "Male"),
-        ("am_santa", "Santa", "Male"),
+        ("af_alloy", "Alloy", "Female", ""),
+        ("af_aoede", "Aoede", "Female", ""),
+        ("af_bella", "Bella", "Female", "warm, husky"),
+        ("af_heart", "Heart", "Female", "default"),
+        ("af_jessica", "Jessica", "Female", ""),
+        ("af_kore", "Kore", "Female", ""),
+        ("af_nicole", "Nicole", "Female", "ASMR"),
+        ("af_nova", "Nova", "Female", ""),
+        ("af_river", "River", "Female", ""),
+        ("af_sarah", "Sarah", "Female", ""),
+        ("af_sky", "Sky", "Female", ""),
+        ("am_adam", "Adam", "Male", ""),
+        ("am_echo", "Echo", "Male", ""),
+        ("am_eric", "Eric", "Male", ""),
+        ("am_fenrir", "Fenrir", "Male", ""),
+        ("am_liam", "Liam", "Male", ""),
+        ("am_michael", "Michael", "Male", ""),
+        ("am_onyx", "Onyx", "Male", ""),
+        ("am_puck", "Puck", "Male", ""),
+        ("am_santa", "Santa", "Male", ""),
     ]),
     ("British English", "en-gb", [
-        ("bf_alice", "Alice", "Female"),
-        ("bf_emma", "Emma", "Female"),
-        ("bf_isabella", "Isabella", "Female"),
-        ("bf_lily", "Lily", "Female"),
-        ("bm_daniel", "Daniel", "Male"),
-        ("bm_fable", "Fable", "Male"),
-        ("bm_george", "George", "Male"),
-        ("bm_lewis", "Lewis", "Male"),
+        ("bf_alice", "Alice", "Female", ""),
+        ("bf_emma", "Emma", "Female", ""),
+        ("bf_isabella", "Isabella", "Female", ""),
+        ("bf_lily", "Lily", "Female", ""),
+        ("bm_daniel", "Daniel", "Male", ""),
+        ("bm_fable", "Fable", "Male", ""),
+        ("bm_george", "George", "Male", ""),
+        ("bm_lewis", "Lewis", "Male", ""),
     ]),
     ("Japanese", "ja", [
-        ("jf_alpha", "Alpha", "Female"),
-        ("jf_gongitsune", "Gongitsune", "Female"),
-        ("jf_nezumi", "Nezumi", "Female"),
-        ("jf_tebukuro", "Tebukuro", "Female"),
-        ("jm_kumo", "Kumo", "Male"),
+        ("jf_alpha", "Alpha", "Female", ""),
+        ("jf_gongitsune", "Gongitsune", "Female", ""),
+        ("jf_nezumi", "Nezumi", "Female", ""),
+        ("jf_tebukuro", "Tebukuro", "Female", ""),
+        ("jm_kumo", "Kumo", "Male", ""),
     ]),
     ("Chinese", "zh", [
-        ("zf_xiaobei", "Xiaobei", "Female"),
-        ("zf_xiaoni", "Xiaoni", "Female"),
-        ("zf_xiaoxiao", "Xiaoxiao", "Female"),
-        ("zf_xiaoyi", "Xiaoyi", "Female"),
-        ("zm_yunjian", "Yunjian", "Male"),
-        ("zm_yunxi", "Yunxi", "Male"),
-        ("zm_yunxia", "Yunxia", "Male"),
-        ("zm_yunyang", "Yunyang", "Male"),
+        ("zf_xiaobei", "Xiaobei", "Female", ""),
+        ("zf_xiaoni", "Xiaoni", "Female", ""),
+        ("zf_xiaoxiao", "Xiaoxiao", "Female", ""),
+        ("zf_xiaoyi", "Xiaoyi", "Female", ""),
+        ("zm_yunjian", "Yunjian", "Male", ""),
+        ("zm_yunxi", "Yunxi", "Male", ""),
+        ("zm_yunxia", "Yunxia", "Male", ""),
+        ("zm_yunyang", "Yunyang", "Male", ""),
     ]),
     ("Spanish", "es", [
-        ("ef_dora", "Dora", "Female"),
-        ("em_alex", "Alex", "Male"),
-        ("em_santa", "Santa", "Male"),
+        ("ef_dora", "Dora", "Female", ""),
+        ("em_alex", "Alex", "Male", ""),
+        ("em_santa", "Santa", "Male", ""),
     ]),
     ("French", "fr", [
-        ("ff_siwis", "Siwis", "Female"),
+        ("ff_siwis", "Siwis", "Female", ""),
     ]),
     ("Hindi", "hi", [
-        ("hf_alpha", "Alpha", "Female"),
-        ("hf_beta", "Beta", "Female"),
-        ("hm_omega", "Omega", "Male"),
-        ("hm_psi", "Psi", "Male"),
+        ("hf_alpha", "Alpha", "Female", ""),
+        ("hf_beta", "Beta", "Female", ""),
+        ("hm_omega", "Omega", "Male", ""),
+        ("hm_psi", "Psi", "Male", ""),
     ]),
     ("Italian", "it", [
-        ("if_sara", "Sara", "Female"),
-        ("im_nicola", "Nicola", "Male"),
+        ("if_sara", "Sara", "Female", ""),
+        ("im_nicola", "Nicola", "Male", ""),
     ]),
     ("Portuguese", "pt-br", [
-        ("pf_dora", "Dora", "Female"),
-        ("pm_alex", "Alex", "Male"),
-        ("pm_santa", "Santa", "Male"),
+        ("pf_dora", "Dora", "Female", ""),
+        ("pm_alex", "Alex", "Male", ""),
+        ("pm_santa", "Santa", "Male", ""),
     ]),
 ]
 
@@ -285,7 +286,7 @@ class VoiceDemoApp(App):
         self.sub_title = "Tab to switch focus | Enter to play"
 
         table = self.query_one("#voice-table", DataTable)
-        table.add_columns("Voice ID", "Name", "Type", "Played")
+        table.add_columns("Voice ID", "Name", "Gender", "Notes", "Played")
         self._populate_voices()
 
         # Focus the table by default
@@ -300,9 +301,9 @@ class VoiceDemoApp(App):
         table.clear()
 
         _, lang_code, voices = LANGUAGES[self.lang_idx]
-        for i, (vid, name, desc) in enumerate(voices):
+        for i, (vid, name, gender, notes) in enumerate(voices):
             played_mark = "✓" if (self.lang_idx, i) in self.played else ""
-            table.add_row(vid, name, desc, played_mark, key=str(i))
+            table.add_row(vid, name, gender, notes, played_mark, key=str(i))
 
     def _update_status(self, text: str) -> None:
         """Update the status display."""
@@ -310,7 +311,7 @@ class VoiceDemoApp(App):
         status.update(text)
 
     def _get_current_selection(self) -> tuple:
-        """Get current voice info: (voice_id, name, desc, lang_code, row_idx)."""
+        """Get current voice info: (voice_id, name, gender, notes, lang_code, row_idx)."""
         table = self.query_one("#voice-table", DataTable)
         _, lang_code, voices = LANGUAGES[self.lang_idx]
 
@@ -318,21 +319,23 @@ class VoiceDemoApp(App):
         if row_idx < 0 or row_idx >= len(voices):
             row_idx = 0
 
-        voice_id, name, desc = voices[row_idx]
-        return voice_id, name, desc, lang_code, row_idx
+        voice_id, name, gender, notes = voices[row_idx]
+        return voice_id, name, gender, notes, lang_code, row_idx
 
     def _get_text_to_speak(self) -> str:
         """Get the text to speak, with placeholders filled in."""
         text_input = self.query_one("#text-input", Input)
-        voice_id, name, desc, lang_code, _ = self._get_current_selection()
+        voice_id, name, gender, notes, lang_code, _ = self._get_current_selection()
 
         text = text_input.value
-        lang_name = LANG_NAMES.get(lang_code, "a")
+        article, nationality = NATIONALITIES.get(lang_code, ("a", ""))
 
         # Replace placeholders
         text = text.replace("{name}", name)
-        text = text.replace("{lang_name}", lang_name)
-        text = text.replace("{desc}", desc)
+        text = text.replace("{article}", article)
+        text = text.replace("{nationality}", nationality)
+        text = text.replace("{gender}", gender)
+        text = text.replace("{notes}", notes)
 
         return text
 
@@ -387,7 +390,7 @@ class VoiceDemoApp(App):
         self._cleanup_audio()
         stop_audio()
 
-        voice_id, name, desc, lang_code, row_idx = self._get_current_selection()
+        voice_id, name, gender, notes, lang_code, row_idx = self._get_current_selection()
         text = self._get_text_to_speak()
 
         # Mark as played
