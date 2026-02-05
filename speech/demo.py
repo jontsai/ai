@@ -56,27 +56,27 @@ class ReadlineInput(Input):
 # Constants
 # =============================================================================
 
-# Placeholders: {name}, {article}, {nationality}, {gender}, {notes}
-DEFAULT_TEXT = "Hi! I'm {name}, {article} {nationality} {gender}. How can I help you today?"
+# Placeholders: {name}, {nationality_article}, {nationality}, {gender}, {notes}
+DEFAULT_TEXT = "Hi! I'm {name}, {nationality_article} {nationality} {gender}. How can I help you today?"
 
-NATIONALITIES = {
-    "en-us": ("an", "American"),
-    "en-gb": ("a", "British"),
-    "ja": ("a", "Japanese"),
-    "zh": ("a", "Chinese"),
-    "es": ("a", "Spanish"),
-    "fr": ("a", "French"),
-    "hi": ("a", "Hindi"),
-    "it": ("an", "Italian"),
-    "pt-br": ("a", "Brazilian Portuguese"),
+# Mapping from voice_id prefix to (lang_code, article, nationality)
+LANG_PREFIX_MAP = {
+    "a": ("en-us", "an", "American"),
+    "b": ("en-gb", "a", "British"),
+    "j": ("ja", "a", "Japanese"),
+    "z": ("zh", "a", "Chinese"),
+    "e": ("es", "a", "Spanish"),
+    "f": ("fr", "a", "French"),
+    "h": ("hi", "a", "Hindi"),
+    "i": ("it", "an", "Italian"),
+    "p": ("pt-br", "a", "Brazilian Portuguese"),
 }
 
 
 @dataclass
 class Voice:
-    """Voice definition with auto-derived name from voice_id."""
+    """Voice definition with properties derived from voice_id."""
     voice_id: str
-    gender: str
     notes: str = ""
 
     @property
@@ -84,85 +84,106 @@ class Voice:
         """Derive name from voice_id (e.g., 'af_heart' -> 'Heart')."""
         return self.voice_id.split("_", 1)[1].title()
 
+    @property
+    def gender(self) -> str:
+        """Derive gender from voice_id[1] ('f'=Female, 'm'=Male)."""
+        return "Female" if self.voice_id[1] == "f" else "Male"
 
-def V(voice_id: str, gender: str, notes: str = "") -> Voice:
+    @property
+    def lang_code(self) -> str:
+        """Derive language code from voice_id[0]."""
+        return LANG_PREFIX_MAP.get(self.voice_id[0], ("en-us", "a", ""))[0]
+
+    @property
+    def nationality_article(self) -> str:
+        """Derive article (a/an) for nationality from voice_id[0]."""
+        return LANG_PREFIX_MAP.get(self.voice_id[0], ("en-us", "a", ""))[1]
+
+    @property
+    def nationality(self) -> str:
+        """Derive nationality from voice_id[0]."""
+        return LANG_PREFIX_MAP.get(self.voice_id[0], ("en-us", "a", ""))[2]
+
+
+def V(voice_id: str, notes: str = "") -> Voice:
     """Shorthand for creating Voice instances."""
-    return Voice(voice_id, gender, notes)
+    return Voice(voice_id, notes)
 
 
 # Voice definitions: (lang_name, lang_code, [Voice, ...])
+# Voice properties (name, gender, lang_code, article, nationality) derived from voice_id
 LANGUAGES = [
     ("American English", "en-us", [
-        V("af_alloy", "Female"),
-        V("af_aoede", "Female"),
-        V("af_bella", "Female", "warm, husky"),
-        V("af_heart", "Female", "default"),
-        V("af_jessica", "Female"),
-        V("af_kore", "Female"),
-        V("af_nicole", "Female", "ASMR"),
-        V("af_nova", "Female"),
-        V("af_river", "Female"),
-        V("af_sarah", "Female"),
-        V("af_sky", "Female"),
-        V("am_adam", "Male"),
-        V("am_echo", "Male"),
-        V("am_eric", "Male"),
-        V("am_fenrir", "Male"),
-        V("am_liam", "Male"),
-        V("am_michael", "Male"),
-        V("am_onyx", "Male"),
-        V("am_puck", "Male"),
-        V("am_santa", "Male"),
+        V("af_alloy"),
+        V("af_aoede"),
+        V("af_bella", "warm, husky"),
+        V("af_heart", "default"),
+        V("af_jessica"),
+        V("af_kore"),
+        V("af_nicole", "ASMR"),
+        V("af_nova"),
+        V("af_river"),
+        V("af_sarah"),
+        V("af_sky"),
+        V("am_adam"),
+        V("am_echo"),
+        V("am_eric"),
+        V("am_fenrir"),
+        V("am_liam"),
+        V("am_michael"),
+        V("am_onyx"),
+        V("am_puck"),
+        V("am_santa"),
     ]),
     ("British English", "en-gb", [
-        V("bf_alice", "Female"),
-        V("bf_emma", "Female"),
-        V("bf_isabella", "Female"),
-        V("bf_lily", "Female"),
-        V("bm_daniel", "Male"),
-        V("bm_fable", "Male"),
-        V("bm_george", "Male"),
-        V("bm_lewis", "Male"),
+        V("bf_alice"),
+        V("bf_emma"),
+        V("bf_isabella"),
+        V("bf_lily"),
+        V("bm_daniel"),
+        V("bm_fable"),
+        V("bm_george"),
+        V("bm_lewis"),
     ]),
     ("Japanese", "ja", [
-        V("jf_alpha", "Female"),
-        V("jf_gongitsune", "Female"),
-        V("jf_nezumi", "Female"),
-        V("jf_tebukuro", "Female"),
-        V("jm_kumo", "Male"),
+        V("jf_alpha"),
+        V("jf_gongitsune"),
+        V("jf_nezumi"),
+        V("jf_tebukuro"),
+        V("jm_kumo"),
     ]),
     ("Chinese", "zh", [
-        V("zf_xiaobei", "Female"),
-        V("zf_xiaoni", "Female"),
-        V("zf_xiaoxiao", "Female"),
-        V("zf_xiaoyi", "Female"),
-        V("zm_yunjian", "Male"),
-        V("zm_yunxi", "Male"),
-        V("zm_yunxia", "Male"),
-        V("zm_yunyang", "Male"),
+        V("zf_xiaobei"),
+        V("zf_xiaoni"),
+        V("zf_xiaoxiao"),
+        V("zf_xiaoyi"),
+        V("zm_yunjian"),
+        V("zm_yunxi"),
+        V("zm_yunxia"),
+        V("zm_yunyang"),
     ]),
     ("Spanish", "es", [
-        V("ef_dora", "Female"),
-        V("em_alex", "Male"),
-        V("em_santa", "Male"),
+        V("ef_dora"),
+        V("em_alex"),
+        V("em_santa"),
     ]),
     ("French", "fr", [
-        V("ff_siwis", "Female"),
+        V("ff_siwis"),
     ]),
     ("Hindi", "hi", [
-        V("hf_alpha", "Female"),
-        V("hf_beta", "Female"),
-        V("hm_omega", "Male"),
-        V("hm_psi", "Male"),
+        V("hf_alpha"),
+        V("hf_beta"),
+        V("hm_omega"),
+        V("hm_psi"),
     ]),
     ("Italian", "it", [
-        V("if_sara", "Female"),
-        V("im_nicola", "Male"),
+        V("if_sara"),
+        V("im_nicola"),
     ]),
     ("Portuguese", "pt-br", [
-        V("pf_dora", "Female"),
-        V("pm_alex", "Male"),
-        V("pm_santa", "Male"),
+        V("pf_dora"),
+        V("pm_alex"),
+        V("pm_santa"),
     ]),
 ]
 
@@ -344,15 +365,14 @@ class VoiceDemoApp(App):
     def _get_text_to_speak(self) -> str:
         """Get the text to speak, with placeholders filled in."""
         text_input = self.query_one("#text-input", Input)
-        voice, lang_code, _ = self._get_current_selection()
+        voice, _, _ = self._get_current_selection()
 
         text = text_input.value
-        article, nationality = NATIONALITIES.get(lang_code, ("a", ""))
 
-        # Replace placeholders
+        # Replace placeholders using Voice properties
         text = text.replace("{name}", voice.name)
-        text = text.replace("{article}", article)
-        text = text.replace("{nationality}", nationality)
+        text = text.replace("{nationality_article}", voice.nationality_article)
+        text = text.replace("{nationality}", voice.nationality)
         text = text.replace("{gender}", voice.gender)
         text = text.replace("{notes}", voice.notes)
 
@@ -409,7 +429,7 @@ class VoiceDemoApp(App):
         self._cleanup_audio()
         stop_audio()
 
-        voice, lang_code, row_idx = self._get_current_selection()
+        voice, _, row_idx = self._get_current_selection()
         text = self._get_text_to_speak()
 
         # Mark as played
@@ -421,7 +441,7 @@ class VoiceDemoApp(App):
         table.move_cursor(row=row_idx)
 
         self._update_status("Generating...")
-        self._generate_and_play(text, voice.voice_id, lang_code)
+        self._generate_and_play(text, voice.voice_id, voice.lang_code)
 
     # -------------------------------------------------------------------------
     # Event Handlers
