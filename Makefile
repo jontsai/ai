@@ -109,6 +109,10 @@ tts:
 	@# Speak speech/out.txt -> speech/out.wav, then play
 	@./scripts/tts.sh
 
+say:
+	@# Speak text directly: make say TEXT="Hello world"
+	@./scripts/say.sh "$(TEXT)"
+
 talk:
 	@# listen -> stt -> tts (one command)
 	@./scripts/talk.sh
