@@ -28,6 +28,12 @@ help:
 	@echo "  make stt-demo            Interactive STT recorder (TUI)"
 	@echo "  make test                Run speech tests"
 	@echo
+	@echo "CosyVoice (high-quality Chinese TTS):"
+	@echo "  make cosyvoice-setup     Full setup (deps + model, ~2GB download)"
+	@echo "  make cosyvoice-install   Install dependencies only"
+	@echo "  make cosyvoice-model     Download pretrained model"
+	@echo "  make cosyvoice-say       TTS with CosyVoice (TEXT=, VOICE=)"
+	@echo
 	@echo "Model sets: minimal | fallback | default | all"
 	@echo "Voices: see speech/voices/README.md (54 voices, 9 languages)"
 
@@ -187,3 +193,18 @@ test:
 	@echo "==> Installing speech dev deps + running tests"
 	@cd speech && ./../scripts/speech-venv.sh install-dev
 	@cd speech && ./../scripts/speech-venv.sh cmd pytest
+
+# --- CosyVoice (high-quality Chinese TTS) ------------------------------------
+
+cosyvoice-setup:
+	@./scripts/cosyvoice-setup.sh setup
+
+cosyvoice-install:
+	@./scripts/cosyvoice-setup.sh install
+
+cosyvoice-model:
+	@./scripts/cosyvoice-setup.sh download-model
+
+cosyvoice-say:
+	@# TTS with CosyVoice: make cosyvoice-say TEXT="你好" VOICE="中文女"
+	@./scripts/cosyvoice-say.sh "$(TEXT)" "$(VOICE)"
