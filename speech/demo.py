@@ -251,7 +251,7 @@ class VoiceDemoApp(App):
             # Text input section
             with Vertical(id="text-section"):
                 yield Label("Text to speak (use {name}, {lang_name}, {desc} for placeholders):", id="text-label")
-                yield Input(value=DEFAULT_TEXT, id="text-input")
+                yield Input(value=DEFAULT_TEXT, id="text-input", select_on_focus=False)
 
             # Language selector and status
             with Horizontal(id="controls-row"):
@@ -408,6 +408,11 @@ class VoiceDemoApp(App):
         """Handle Enter in text input."""
         self.paused = False
         self._play_current()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Restore default text if input is cleared."""
+        if event.input.id == "text-input" and event.value == "":
+            event.input.value = DEFAULT_TEXT
 
     # -------------------------------------------------------------------------
     # Actions
