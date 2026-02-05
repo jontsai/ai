@@ -2,3 +2,4 @@ faster-whisper
 kokoro-onnx
 soundfile
 numpy
+textual
