@@ -101,16 +101,32 @@ LANGUAGES = [
     ]),
 ]
 
+# Greetings for each language
+# TODO: kokoro-onnx currently only supports en-us/en-gb phonemization.
+# To enable native language greetings, need either:
+#   1. Switch to full 'kokoro' package (requires spacy, broken on Python 3.13+)
+#   2. Wait for kokoro-onnx to add multi-language G2P support
+#   3. Use a separate phonemizer like 'misaki' (pip install misaki[ja] misaki[zh])
+# For now, non-English voices speak English text.
 GREETINGS = {
     "en-us": "Hi! I'm {name}. How can I help you today?",
     "en-gb": "Hello! I'm {name}. How may I assist you today?",
-    "ja": "こんにちは！私は{name}です。今日はどうお手伝いしましょうか？",
-    "zh": "你好！我是{name}。今天我能帮您什么？",
-    "es": "¡Hola! Soy {name}. ¿En qué puedo ayudarte hoy?",
-    "fr": "Bonjour! Je suis {name}. Comment puis-je vous aider?",
-    "hi": "नमस्ते! मैं {name} हूं। आज मैं आपकी कैसे मदद कर सकती हूं?",
-    "it": "Ciao! Sono {name}. Come posso aiutarti oggi?",
-    "pt-br": "Olá! Eu sou {name}. Como posso ajudá-lo hoje?",
+    # Native greetings (uncomment when multi-language support is available):
+    # "ja": "こんにちは！私は{name}です。今日はどうお手伝いしましょうか？",
+    # "zh": "你好！我是{name}。今天我能帮您什么？",
+    # "es": "¡Hola! Soy {name}. ¿En qué puedo ayudarte hoy?",
+    # "fr": "Bonjour! Je suis {name}. Comment puis-je vous aider?",
+    # "hi": "नमस्ते! मैं {name} हूं। आज मैं आपकी कैसे मदद कर सकती हूं?",
+    # "it": "Ciao! Sono {name}. Come posso aiutarti oggi?",
+    # "pt-br": "Olá! Eu sou {name}. Como posso ajudá-lo hoje?",
+    # Fallback English greetings for non-English voices:
+    "ja": "Hi! I'm {name}, a Japanese voice. How can I help you today?",
+    "zh": "Hi! I'm {name}, a Chinese voice. How can I help you today?",
+    "es": "Hi! I'm {name}, a Spanish voice. How can I help you today?",
+    "fr": "Hi! I'm {name}, a French voice. How can I help you today?",
+    "hi": "Hi! I'm {name}, a Hindi voice. How can I help you today?",
+    "it": "Hi! I'm {name}, an Italian voice. How can I help you today?",
+    "pt-br": "Hi! I'm {name}, a Portuguese voice. How can I help you today?",
 }
 
 
@@ -143,7 +159,9 @@ def generate_audio(voice_id: str, name: str, lang: str) -> str:
     import tts
 
     greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name)
-    samples, sample_rate = tts.synthesize(greeting, voice=voice_id)
+    # kokoro-onnx only supports en-us/en-gb phonemization
+    tts_lang = "en-gb" if lang == "en-gb" else "en-us"
+    samples, sample_rate = tts.synthesize(greeting, voice=voice_id, lang=tts_lang)
 
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
         tmp_path = f.name
@@ -157,13 +175,16 @@ def play_audio(wav_path: str) -> subprocess.Popen:
     return subprocess.Popen(['afplay', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def display(languages, lang_idx, voice_idx, played):
+def display(languages, lang_idx, voice_idx, played, paused=False):
     """Display the voice browser UI."""
     print('\033[2J\033[H', end='')  # Clear screen
 
     # Header
     print("╔" + "═" * 63 + "╗")
-    print("║" + "  Kokoro TTS Voice Demo".center(63) + "║")
+    title = "  Kokoro TTS Voice Demo"
+    if paused:
+        title += "  \033[1;33m[PAUSED]\033[0m"
+    print("║" + title.center(72) + "║")
     print("╠" + "═" * 63 + "╣")
 
     # Language tabs
@@ -208,7 +229,10 @@ def display(languages, lang_idx, voice_idx, played):
 
     # Footer
     print("╟" + "─" * 63 + "╢")
-    print("║  j/↓ Next   k/↑ Prev   Tab Switch   r Replay   q Quit".ljust(64) + "║")
+    if paused:
+        print("║  \033[33mSpace resume\033[0m  j/k Nav  J/K or Tab Lang  r Play  q Quit".ljust(73) + "║")
+    else:
+        print("║  Space pause  j/k Nav  J/K or Tab Lang  r Play  q Quit".ljust(64) + "║")
     print("╚" + "═" * 63 + "╝")
     sys.stdout.flush()
 
@@ -221,6 +245,7 @@ def main():
     tmp_path = None
     pending_play = False  # Flag to play after navigation settles
     idle_count = 0  # Count idle cycles to detect settling
+    paused = False  # Pause auto-advance
 
     def cleanup():
         nonlocal audio_proc, tmp_path
@@ -241,7 +266,7 @@ def main():
         voice_id, name, _ = voices[voice_idx]
 
         played.add((lang_idx, voice_idx))
-        display(LANGUAGES, lang_idx, voice_idx, played)
+        display(LANGUAGES, lang_idx, voice_idx, played, paused)
 
         tmp_path = generate_audio(voice_id, name, lang_code)
         audio_proc = play_audio(tmp_path)
@@ -252,26 +277,29 @@ def main():
         cleanup()
         lang_idx = new_lang_idx
         voice_idx = new_voice_idx
-        pending_play = True
+        pending_play = not paused  # Only auto-play if not paused
         idle_count = 0
-        display(LANGUAGES, lang_idx, voice_idx, played)
+        display(LANGUAGES, lang_idx, voice_idx, played, paused)
 
     try:
-        display(LANGUAGES, lang_idx, voice_idx, played)
+        display(LANGUAGES, lang_idx, voice_idx, played, paused)
         play_current()
 
         while True:
             key = get_key_nonblocking(timeout=0.05)  # Faster polling for responsive navigation
 
-            # Check if audio finished (auto-advance)
+            # Check if audio finished (auto-advance if not paused)
             if audio_proc and audio_proc.poll() is not None:
-                _, _, voices = LANGUAGES[lang_idx]
-                navigate(lang_idx, (voice_idx + 1) % len(voices))
-                pending_play = True
-                idle_count = 3  # Play immediately after audio ends
+                if not paused:
+                    _, _, voices = LANGUAGES[lang_idx]
+                    navigate(lang_idx, (voice_idx + 1) % len(voices))
+                    pending_play = True
+                    idle_count = 3  # Play immediately after audio ends
+                else:
+                    audio_proc = None  # Clear finished process
 
             # If pending play and idle for a bit, start playing
-            if pending_play:
+            if pending_play and not paused:
                 idle_count += 1
                 if idle_count > 3:  # ~150ms of no input
                     play_current()
@@ -289,8 +317,8 @@ def main():
                 print("Done!")
                 return 0
 
-            elif key == '\x1b':  # Escape (might be arrow key)
-                pass  # Plain Esc - ignore
+            elif key == '\x1b':  # Plain Escape
+                pass
 
             elif key == '\x1b[A' or key == 'k':  # Up, k
                 navigate(lang_idx, (voice_idx - 1) % len(voices))
@@ -298,18 +326,21 @@ def main():
             elif key == '\x1b[B' or key == 'j':  # Down, j
                 navigate(lang_idx, (voice_idx + 1) % len(voices))
 
-            elif key == '\x1b[Z':  # Shift+Tab
+            elif key == '\x1b[Z' or key == 'K':  # Shift+Tab or K
                 new_lang = (lang_idx - 1) % len(LANGUAGES)
                 navigate(new_lang, 0)
 
-            elif key == '\t':  # Tab
+            elif key == '\t' or key == 'J':  # Tab or J
                 new_lang = (lang_idx + 1) % len(LANGUAGES)
                 navigate(new_lang, 0)
 
-            elif key == 'r':  # Replay
-                play_current()
+            elif key == ' ':  # Space - toggle pause
+                paused = not paused
+                if paused:
+                    stop_audio()
+                display(LANGUAGES, lang_idx, voice_idx, played, paused)
 
-            elif key in (' ', '\r'):  # Space, Enter - immediate play
+            elif key == 'r' or key == '\r':  # r or Enter - play current
                 play_current()
 
     except KeyboardInterrupt:
