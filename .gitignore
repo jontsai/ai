@@ -7,3 +7,14 @@ tmp/
 
 # If you ever add logs
 *.log
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Speech models (large files, download separately)
+speech/models/
+
+# Speech buffer (temp I/O files)
+speech/buffer/

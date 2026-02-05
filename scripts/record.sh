@@ -5,7 +5,7 @@ MODE="${1:-record}"
 
 # You can override these:
 DURATION="${DURATION:-10}"
-OUT="speech/in.wav"
+OUT="speech/buffer/in.wav"
 
 # Choose mic by index. If you don't set MIC, we default to ":0" (often default audio input).
 # List devices first to be sure:
@@ -18,7 +18,7 @@ devices() {
 }
 
 record() {
-  mkdir -p speech
+  mkdir -p speech/buffer
   echo "Recording ${DURATION}s from avfoundation input '${MIC}' -> ${OUT}"
   echo "Tip: set MIC=':1' (or similar) after running: ./scripts/record.sh devices"
   ffmpeg -hide_banner -loglevel error \
