@@ -1,0 +1,4 @@
+faster-whisper
+kokoro
+soundfile
+numpy

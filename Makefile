@@ -83,3 +83,37 @@ _models_for_set:
 	  ""|default) echo "$(MODELS_DEFAULT)" ;; \
 	  *) echo "ERROR: Unknown MODEL_SET=$(MODEL_SET). Use minimal|fallback|default|all"; exit 1 ;; \
 	esac
+
+# --- Speech (STT/TTS) -------------------------------------------------------
+
+speech-doctor:
+	@echo "==> Checking speech dependencies"
+	@command -v ffmpeg >/dev/null || { echo "ERROR: ffmpeg not found (brew install ffmpeg)"; exit 1; }
+	@python3 -V
+	@echo
+	@echo "==> Creating venv (if missing) and installing speech deps"
+	@cd speech && ./../scripts/speech-venv.sh install
+	@echo
+	@echo "==> Listing audio devices (macOS avfoundation)"
+	@./scripts/record.sh devices
+
+listen:
+	@# Record microphone to speech/in.wav (default 10s; override: DURATION=30)
+	@DURATION="$(DURATION)" ./scripts/record.sh record
+
+stt:
+	@# Transcribe speech/in.wav -> speech/out.txt
+	@./scripts/stt.sh
+
+tts:
+	@# Speak speech/out.txt -> speech/out.wav, then play
+	@./scripts/tts.sh
+
+talk:
+	@# listen -> stt -> tts (one command)
+	@./scripts/talk.sh
+
+test:
+	@echo "==> Installing speech dev deps + running tests"
+	@cd speech && ./../scripts/speech-venv.sh install-dev
+	@cd speech && ./../scripts/speech-venv.sh cmd pytest
