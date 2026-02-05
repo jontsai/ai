@@ -3,13 +3,18 @@
 Interactive TTS voice demo.
 
 Controls:
-  j/n/Space/Enter = Next voice
-  k/p/Backspace   = Previous voice
-  r               = Replay current voice
-  q/Esc           = Quit
-  1-9             = Jump to voice by number (in current page)
+  j/n/Space/Enter/→ = Next voice
+  k/p/Backspace/←   = Previous voice
+  r                 = Replay current voice
+  q/Esc             = Quit
+  1-9               = Jump to voice by number
+
+Audio auto-advances when finished. Press j/k to skip/go back.
 """
 import os
+import select
+import signal
+import subprocess
 import sys
 import tempfile
 import termios
@@ -104,19 +109,30 @@ GREETINGS = {
 }
 
 
-def get_key():
-    """Read a single keypress."""
+def get_key_nonblocking(timeout=0.1):
+    """Read a single keypress with timeout. Returns None if no key pressed."""
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        # Handle escape sequences (arrow keys, etc.)
-        if ch == '\x1b':
-            ch += sys.stdin.read(2)
-        return ch
+        rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+        if rlist:
+            ch = sys.stdin.read(1)
+            # Handle escape sequences (arrow keys, etc.)
+            if ch == '\x1b':
+                # Check if more chars available
+                rlist2, _, _ = select.select([sys.stdin], [], [], 0.05)
+                if rlist2:
+                    ch += sys.stdin.read(2)
+            return ch
+        return None
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+
+
+def stop_audio():
+    """Stop any currently playing audio."""
+    subprocess.run(['killall', 'afplay'], stderr=subprocess.DEVNULL)
 
 
 def clear_line():
@@ -124,25 +140,23 @@ def clear_line():
     print('\r\033[K', end='', flush=True)
 
 
-def play_voice(voice_id: str, name: str, desc: str, lang: str):
-    """Generate and play TTS for a voice."""
+def generate_audio(voice_id: str, name: str, desc: str, lang: str) -> str:
+    """Generate TTS audio and return temp file path."""
     import tts
 
     greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name, desc=desc)
-
-    # Generate audio
     samples, sample_rate = tts.synthesize(greeting, voice=voice_id)
 
-    # Write to temp file and play
     with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
         tmp_path = f.name
         sf.write(tmp_path, samples, sample_rate)
 
-    try:
-        os.system(f'afplay "{tmp_path}" &')
-    finally:
-        # Clean up after a delay (let audio start playing)
-        os.system(f'(sleep 10 && rm -f "{tmp_path}") &')
+    return tmp_path
+
+
+def play_audio(wav_path: str) -> subprocess.Popen:
+    """Start playing audio, return process handle."""
+    return subprocess.Popen(['afplay', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def main():
@@ -155,43 +169,75 @@ def main():
     print("  j/n/→/Space = Next    k/p/← = Previous    r = Replay")
     print("  q/Esc = Quit          1-9 = Jump to voice")
     print()
+    print("Audio auto-advances. Press j/k to skip.")
     print("-" * 60)
 
     idx = 0
     total = len(VOICES)
+    audio_proc = None
+    tmp_path = None
 
-    while True:
-        voice_id, name, desc, lang = VOICES[idx]
+    def cleanup():
+        nonlocal audio_proc, tmp_path
+        if audio_proc:
+            audio_proc.terminate()
+            audio_proc = None
+        if tmp_path and os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+            tmp_path = None
 
-        # Display current voice
-        clear_line()
-        print(f"\r[{idx + 1}/{total}] {voice_id}: {name} - {desc}", flush=True)
-
-        # Play it
-        play_voice(voice_id, name, desc, lang)
-
-        # Wait for input
+    try:
         while True:
-            key = get_key()
+            voice_id, name, desc, lang = VOICES[idx]
 
-            if key in ('q', '\x1b', '\x03'):  # q, Esc, Ctrl+C
-                print("\n\nDone!")
-                return 0
-            elif key in ('j', 'n', ' ', '\r', '\x1b[C'):  # j, n, Space, Enter, Right
-                idx = (idx + 1) % total
-                break
-            elif key in ('k', 'p', '\x7f', '\x1b[D'):  # k, p, Backspace, Left
-                idx = (idx - 1) % total
-                break
-            elif key == 'r':  # Replay
-                break
-            elif key.isdigit() and key != '0':
-                # Jump to voice number (1-indexed, within current "page" of 9)
-                page_start = (idx // 9) * 9
-                new_idx = page_start + int(key) - 1
-                if new_idx < total:
-                    idx = new_idx
-                break
+            # Display current voice
+            clear_line()
+            print(f"\r[{idx + 1}/{total}] {voice_id}: {name} - {desc}", flush=True)
+
+            # Generate and play audio
+            cleanup()
+            stop_audio()
+            tmp_path = generate_audio(voice_id, name, desc, lang)
+            audio_proc = play_audio(tmp_path)
+
+            # Wait for input or audio to finish
+            while True:
+                key = get_key_nonblocking(timeout=0.1)
+
+                # Check if audio finished (auto-advance)
+                if audio_proc and audio_proc.poll() is not None:
+                    idx = (idx + 1) % total
+                    break
+
+                if key is None:
+                    continue
+
+                if key in ('q', '\x1b', '\x03'):  # q, Esc, Ctrl+C
+                    cleanup()
+                    stop_audio()
+                    print("\n\nDone!")
+                    return 0
+                elif key in ('j', 'n', ' ', '\r', '\x1b[C'):  # j, n, Space, Enter, Right
+                    stop_audio()
+                    idx = (idx + 1) % total
+                    break
+                elif key in ('k', 'p', '\x7f', '\x1b[D'):  # k, p, Backspace, Left
+                    stop_audio()
+                    idx = (idx - 1) % total
+                    break
+                elif key == 'r':  # Replay
+                    stop_audio()
+                    break
+                elif key.isdigit() and key != '0':
+                    stop_audio()
+                    page_start = (idx // 9) * 9
+                    new_idx = page_start + int(key) - 1
+                    if new_idx < total:
+                        idx = new_idx
+                    break
+    finally:
+        cleanup()
+        stop_audio()
 
 
 if __name__ == "__main__":
