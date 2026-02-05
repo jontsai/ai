@@ -108,25 +108,21 @@ LANGUAGES = [
 #   2. Wait for kokoro-onnx to add multi-language G2P support
 #   3. Use a separate phonemizer like 'misaki' (pip install misaki[ja] misaki[zh])
 # For now, non-English voices speak English text.
+# {name} = voice name, {desc} = voice type (e.g., "Female", "Male"), {lang_name} = language name
 GREETINGS = {
-    "en-us": "Hi! I'm {name}. How can I help you today?",
-    "en-gb": "Hello! I'm {name}. How may I assist you today?",
+    "en-us": "Hi! I'm {name}, an American {desc}. How can I help you today?",
+    "en-gb": "Hello! I'm {name}, a British {desc}. How may I assist you today?",
     # Native greetings (uncomment when multi-language support is available):
-    # "ja": "こんにちは！私は{name}です。今日はどうお手伝いしましょうか？",
-    # "zh": "你好！我是{name}。今天我能帮您什么？",
-    # "es": "¡Hola! Soy {name}. ¿En qué puedo ayudarte hoy?",
-    # "fr": "Bonjour! Je suis {name}. Comment puis-je vous aider?",
-    # "hi": "नमस्ते! मैं {name} हूं। आज मैं आपकी कैसे मदद कर सकती हूं?",
-    # "it": "Ciao! Sono {name}. Come posso aiutarti oggi?",
-    # "pt-br": "Olá! Eu sou {name}. Como posso ajudá-lo hoje?",
+    # "ja": "こんにちは！私は{name}です、{desc}です。今日はどうお手伝いしましょうか？",
+    # "zh": "你好！我是{name}，{desc}。今天我能帮您什么？",
     # Fallback English greetings for non-English voices:
-    "ja": "Hi! I'm {name}, a Japanese voice. How can I help you today?",
-    "zh": "Hi! I'm {name}, a Chinese voice. How can I help you today?",
-    "es": "Hi! I'm {name}, a Spanish voice. How can I help you today?",
-    "fr": "Hi! I'm {name}, a French voice. How can I help you today?",
-    "hi": "Hi! I'm {name}, a Hindi voice. How can I help you today?",
-    "it": "Hi! I'm {name}, an Italian voice. How can I help you today?",
-    "pt-br": "Hi! I'm {name}, a Portuguese voice. How can I help you today?",
+    "ja": "Hi! I'm {name}, a Japanese {desc}. How can I help you today?",
+    "zh": "Hi! I'm {name}, a Chinese {desc}. How can I help you today?",
+    "es": "Hi! I'm {name}, a Spanish {desc}. How can I help you today?",
+    "fr": "Hi! I'm {name}, a French {desc}. How can I help you today?",
+    "hi": "Hi! I'm {name}, a Hindi {desc}. How can I help you today?",
+    "it": "Hi! I'm {name}, an Italian {desc}. How can I help you today?",
+    "pt-br": "Hi! I'm {name}, a Brazilian Portuguese {desc}. How can I help you today?",
 }
 
 
@@ -154,11 +150,11 @@ def stop_audio():
     subprocess.run(['killall', 'afplay'], stderr=subprocess.DEVNULL)
 
 
-def generate_audio(voice_id: str, name: str, lang: str) -> str:
+def generate_audio(voice_id: str, name: str, desc: str, lang: str) -> str:
     """Generate TTS audio and return temp file path."""
     import tts
 
-    greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name)
+    greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name, desc=desc)
     # kokoro-onnx only supports en-us/en-gb phonemization
     tts_lang = "en-gb" if lang == "en-gb" else "en-us"
     samples, sample_rate = tts.synthesize(greeting, voice=voice_id, lang=tts_lang)
@@ -263,12 +259,12 @@ def main():
         pending_play = False
 
         _, lang_code, voices = LANGUAGES[lang_idx]
-        voice_id, name, _ = voices[voice_idx]
+        voice_id, name, desc = voices[voice_idx]
 
         played.add((lang_idx, voice_idx))
         display(LANGUAGES, lang_idx, voice_idx, played, paused)
 
-        tmp_path = generate_audio(voice_id, name, lang_code)
+        tmp_path = generate_audio(voice_id, name, desc, lang_code)
         audio_proc = play_audio(tmp_path)
 
     def navigate(new_lang_idx, new_voice_idx):
