@@ -225,12 +225,14 @@ class VoiceDemoApp(App):
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
+        Binding("tab", "focus_next", "Next Field", show=True),
+        Binding("shift+tab", "focus_previous", "Prev Field", show=False),
+        Binding("j", "cursor_down", "↓ Voice", show=True),
+        Binding("k", "cursor_up", "↑ Voice", show=True),
+        Binding("enter", "play", "Play", show=True),
+        Binding("space", "toggle_pause", "Pause", show=True),
+        Binding("q", "quit", "Quit", show=True),
         Binding("escape", "quit", "Quit", show=False),
-        Binding("space", "toggle_pause", "Pause/Resume"),
-        Binding("enter", "play", "Play", show=False),
-        Binding("j", "cursor_down", "Next", show=False),
-        Binding("k", "cursor_up", "Prev", show=False),
     ]
 
     def __init__(self):
