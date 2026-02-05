@@ -41,7 +41,7 @@ from textual import work
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, ScrollableContainer
-from textual.widgets import Footer, Header, Label, Static, DataTable, ProgressBar
+from textual.widgets import Footer, Header, Label, Select, Static, DataTable, ProgressBar
 from textual.worker import Worker, WorkerState
 
 # =============================================================================
@@ -251,13 +251,19 @@ class STTDemoApp(App):
         padding: 1;
     }
 
-    #status-section {
+    #controls-row {
         height: 3;
         margin-bottom: 1;
     }
 
+    #mic-select {
+        width: 40;
+    }
+
     #status-label {
-        width: 100%;
+        width: 1fr;
+        content-align: right middle;
+        text-align: right;
     }
 
     #waveform-section {
@@ -330,6 +336,7 @@ class STTDemoApp(App):
         Binding("c", "clear_buffer", "Clear", show=False),
         Binding("q", "quit", "Quit", show=True),
         Binding("escape", "quit", "Quit", show=False),
+        Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
     def __init__(self):
@@ -342,15 +349,37 @@ class STTDemoApp(App):
         self.play_position = 0
         self.last_transcribe_time = 0
         self.live_transcribe_enabled = True
+        self.selected_mic = None  # None = default device
+        self.available_mics = self._get_input_devices()
+
+    def _get_input_devices(self) -> list:
+        """Get list of available input devices."""
+        devices = []
+        try:
+            all_devices = sd.query_devices()
+            default_input = sd.default.device[0]
+            for i, d in enumerate(all_devices):
+                if d['max_input_channels'] > 0:
+                    is_default = (i == default_input)
+                    devices.append((i, d['name'], is_default))
+        except Exception:
+            pass
+        return devices
 
     def compose(self) -> ComposeResult:
         """Create the UI layout."""
         yield Header()
 
         with Vertical(id="main-container"):
-            # Status section
-            with Vertical(id="status-section"):
-                yield Static("Ready. Press Space to start recording.", id="status-label")
+            # Controls row with mic selector
+            with Horizontal(id="controls-row"):
+                # Build mic options
+                mic_options = [("Default Microphone", -1)]
+                for idx, name, is_default in self.available_mics:
+                    label = f"{'* ' if is_default else ''}{name}"
+                    mic_options.append((label, idx))
+                yield Select(mic_options, value=-1, id="mic-select", prompt="Microphone")
+                yield Static("", id="status-label")
 
             # Waveform section
             with Vertical(id="waveform-section"):
@@ -358,7 +387,7 @@ class STTDemoApp(App):
                     yield Label("Waveform:", id="waveform-label")
                     yield Label("00:00.0", id="time-label")
                 yield Static("─" * WAVEFORM_WIDTH, id="waveform")
-                yield Static("Selection: none", id="selection-label")
+                yield Static("Selection: none (use [ and ] to select)", id="selection-label")
 
             # Segments table
             with Vertical(id="segments-section"):
@@ -370,11 +399,13 @@ class STTDemoApp(App):
     def on_mount(self) -> None:
         """Initialize on startup."""
         self.title = "STT Recording Demo"
-        self.sub_title = "Space=Record | p=Play | [/]=Select | d=Delete"
+        self.sub_title = "q=Quit | Space=Record | p=Play"
 
         table = self.query_one("#segments-table", DataTable)
         table.add_columns("Time", "Duration", "Text")
         table.cursor_type = "row"
+
+        self._update_status("Ready. Select mic and press Space to record.")
 
     def _update_status(self, text: str, style: str = "") -> None:
         """Update the status display."""
@@ -433,6 +464,13 @@ class STTDemoApp(App):
         if self.is_recording:
             self.audio.append(indata.copy())
 
+    def on_select_changed(self, event) -> None:
+        """Handle mic selection change."""
+        if event.select.id == "mic-select":
+            self.selected_mic = event.value if event.value != -1 else None
+            mic_name = "default" if self.selected_mic is None else f"device {self.selected_mic}"
+            self._update_status(f"Mic: {mic_name}")
+
     def _start_recording(self) -> None:
         """Start recording audio."""
         self.audio.clear()
@@ -441,9 +479,13 @@ class STTDemoApp(App):
         self.record_start_time = time.time()
         self.last_transcribe_time = time.time()
 
+        # Use selected mic or default
+        device = self.selected_mic  # None means default
+
         self.recording_stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
             channels=CHANNELS,
+            device=device,
             dtype=np.float32,
             callback=self._recording_callback
         )
