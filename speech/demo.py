@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 # Add parent dir to path for imports
@@ -70,79 +71,98 @@ NATIONALITIES = {
     "pt-br": ("a", "Brazilian Portuguese"),
 }
 
-# Voice definitions: (lang_name, lang_code, [(voice_id, name, gender, notes), ...])
+
+@dataclass
+class Voice:
+    """Voice definition with auto-derived name from voice_id."""
+    voice_id: str
+    gender: str
+    notes: str = ""
+
+    @property
+    def name(self) -> str:
+        """Derive name from voice_id (e.g., 'af_heart' -> 'Heart')."""
+        return self.voice_id.split("_", 1)[1].title()
+
+
+def V(voice_id: str, gender: str, notes: str = "") -> Voice:
+    """Shorthand for creating Voice instances."""
+    return Voice(voice_id, gender, notes)
+
+
+# Voice definitions: (lang_name, lang_code, [Voice, ...])
 LANGUAGES = [
     ("American English", "en-us", [
-        ("af_alloy", "Alloy", "Female", ""),
-        ("af_aoede", "Aoede", "Female", ""),
-        ("af_bella", "Bella", "Female", "warm, husky"),
-        ("af_heart", "Heart", "Female", "default"),
-        ("af_jessica", "Jessica", "Female", ""),
-        ("af_kore", "Kore", "Female", ""),
-        ("af_nicole", "Nicole", "Female", "ASMR"),
-        ("af_nova", "Nova", "Female", ""),
-        ("af_river", "River", "Female", ""),
-        ("af_sarah", "Sarah", "Female", ""),
-        ("af_sky", "Sky", "Female", ""),
-        ("am_adam", "Adam", "Male", ""),
-        ("am_echo", "Echo", "Male", ""),
-        ("am_eric", "Eric", "Male", ""),
-        ("am_fenrir", "Fenrir", "Male", ""),
-        ("am_liam", "Liam", "Male", ""),
-        ("am_michael", "Michael", "Male", ""),
-        ("am_onyx", "Onyx", "Male", ""),
-        ("am_puck", "Puck", "Male", ""),
-        ("am_santa", "Santa", "Male", ""),
+        V("af_alloy", "Female"),
+        V("af_aoede", "Female"),
+        V("af_bella", "Female", "warm, husky"),
+        V("af_heart", "Female", "default"),
+        V("af_jessica", "Female"),
+        V("af_kore", "Female"),
+        V("af_nicole", "Female", "ASMR"),
+        V("af_nova", "Female"),
+        V("af_river", "Female"),
+        V("af_sarah", "Female"),
+        V("af_sky", "Female"),
+        V("am_adam", "Male"),
+        V("am_echo", "Male"),
+        V("am_eric", "Male"),
+        V("am_fenrir", "Male"),
+        V("am_liam", "Male"),
+        V("am_michael", "Male"),
+        V("am_onyx", "Male"),
+        V("am_puck", "Male"),
+        V("am_santa", "Male"),
     ]),
     ("British English", "en-gb", [
-        ("bf_alice", "Alice", "Female", ""),
-        ("bf_emma", "Emma", "Female", ""),
-        ("bf_isabella", "Isabella", "Female", ""),
-        ("bf_lily", "Lily", "Female", ""),
-        ("bm_daniel", "Daniel", "Male", ""),
-        ("bm_fable", "Fable", "Male", ""),
-        ("bm_george", "George", "Male", ""),
-        ("bm_lewis", "Lewis", "Male", ""),
+        V("bf_alice", "Female"),
+        V("bf_emma", "Female"),
+        V("bf_isabella", "Female"),
+        V("bf_lily", "Female"),
+        V("bm_daniel", "Male"),
+        V("bm_fable", "Male"),
+        V("bm_george", "Male"),
+        V("bm_lewis", "Male"),
     ]),
     ("Japanese", "ja", [
-        ("jf_alpha", "Alpha", "Female", ""),
-        ("jf_gongitsune", "Gongitsune", "Female", ""),
-        ("jf_nezumi", "Nezumi", "Female", ""),
-        ("jf_tebukuro", "Tebukuro", "Female", ""),
-        ("jm_kumo", "Kumo", "Male", ""),
+        V("jf_alpha", "Female"),
+        V("jf_gongitsune", "Female"),
+        V("jf_nezumi", "Female"),
+        V("jf_tebukuro", "Female"),
+        V("jm_kumo", "Male"),
     ]),
     ("Chinese", "zh", [
-        ("zf_xiaobei", "Xiaobei", "Female", ""),
-        ("zf_xiaoni", "Xiaoni", "Female", ""),
-        ("zf_xiaoxiao", "Xiaoxiao", "Female", ""),
-        ("zf_xiaoyi", "Xiaoyi", "Female", ""),
-        ("zm_yunjian", "Yunjian", "Male", ""),
-        ("zm_yunxi", "Yunxi", "Male", ""),
-        ("zm_yunxia", "Yunxia", "Male", ""),
-        ("zm_yunyang", "Yunyang", "Male", ""),
+        V("zf_xiaobei", "Female"),
+        V("zf_xiaoni", "Female"),
+        V("zf_xiaoxiao", "Female"),
+        V("zf_xiaoyi", "Female"),
+        V("zm_yunjian", "Male"),
+        V("zm_yunxi", "Male"),
+        V("zm_yunxia", "Male"),
+        V("zm_yunyang", "Male"),
     ]),
     ("Spanish", "es", [
-        ("ef_dora", "Dora", "Female", ""),
-        ("em_alex", "Alex", "Male", ""),
-        ("em_santa", "Santa", "Male", ""),
+        V("ef_dora", "Female"),
+        V("em_alex", "Male"),
+        V("em_santa", "Male"),
     ]),
     ("French", "fr", [
-        ("ff_siwis", "Siwis", "Female", ""),
+        V("ff_siwis", "Female"),
     ]),
     ("Hindi", "hi", [
-        ("hf_alpha", "Alpha", "Female", ""),
-        ("hf_beta", "Beta", "Female", ""),
-        ("hm_omega", "Omega", "Male", ""),
-        ("hm_psi", "Psi", "Male", ""),
+        V("hf_alpha", "Female"),
+        V("hf_beta", "Female"),
+        V("hm_omega", "Male"),
+        V("hm_psi", "Male"),
     ]),
     ("Italian", "it", [
-        ("if_sara", "Sara", "Female", ""),
-        ("im_nicola", "Nicola", "Male", ""),
+        V("if_sara", "Female"),
+        V("im_nicola", "Male"),
     ]),
     ("Portuguese", "pt-br", [
-        ("pf_dora", "Dora", "Female", ""),
-        ("pm_alex", "Alex", "Male", ""),
-        ("pm_santa", "Santa", "Male", ""),
+        V("pf_dora", "Female"),
+        V("pm_alex", "Male"),
+        V("pm_santa", "Male"),
     ]),
 ]
 
@@ -301,17 +321,17 @@ class VoiceDemoApp(App):
         table.clear()
 
         _, lang_code, voices = LANGUAGES[self.lang_idx]
-        for i, (vid, name, gender, notes) in enumerate(voices):
+        for i, voice in enumerate(voices):
             played_mark = "✓" if (self.lang_idx, i) in self.played else ""
-            table.add_row(vid, name, gender, notes, played_mark, key=str(i))
+            table.add_row(voice.voice_id, voice.name, voice.gender, voice.notes, played_mark, key=str(i))
 
     def _update_status(self, text: str) -> None:
         """Update the status display."""
         status = self.query_one("#status", Static)
         status.update(text)
 
-    def _get_current_selection(self) -> tuple:
-        """Get current voice info: (voice_id, name, gender, notes, lang_code, row_idx)."""
+    def _get_current_selection(self) -> tuple[Voice, str, int]:
+        """Get current voice info: (Voice, lang_code, row_idx)."""
         table = self.query_one("#voice-table", DataTable)
         _, lang_code, voices = LANGUAGES[self.lang_idx]
 
@@ -319,23 +339,22 @@ class VoiceDemoApp(App):
         if row_idx < 0 or row_idx >= len(voices):
             row_idx = 0
 
-        voice_id, name, gender, notes = voices[row_idx]
-        return voice_id, name, gender, notes, lang_code, row_idx
+        return voices[row_idx], lang_code, row_idx
 
     def _get_text_to_speak(self) -> str:
         """Get the text to speak, with placeholders filled in."""
         text_input = self.query_one("#text-input", Input)
-        voice_id, name, gender, notes, lang_code, _ = self._get_current_selection()
+        voice, lang_code, _ = self._get_current_selection()
 
         text = text_input.value
         article, nationality = NATIONALITIES.get(lang_code, ("a", ""))
 
         # Replace placeholders
-        text = text.replace("{name}", name)
+        text = text.replace("{name}", voice.name)
         text = text.replace("{article}", article)
         text = text.replace("{nationality}", nationality)
-        text = text.replace("{gender}", gender)
-        text = text.replace("{notes}", notes)
+        text = text.replace("{gender}", voice.gender)
+        text = text.replace("{notes}", voice.notes)
 
         return text
 
@@ -390,7 +409,7 @@ class VoiceDemoApp(App):
         self._cleanup_audio()
         stop_audio()
 
-        voice_id, name, gender, notes, lang_code, row_idx = self._get_current_selection()
+        voice, lang_code, row_idx = self._get_current_selection()
         text = self._get_text_to_speak()
 
         # Mark as played
@@ -402,7 +421,7 @@ class VoiceDemoApp(App):
         table.move_cursor(row=row_idx)
 
         self._update_status("Generating...")
-        self._generate_and_play(text, voice_id, lang_code)
+        self._generate_and_play(text, voice.voice_id, lang_code)
 
     # -------------------------------------------------------------------------
     # Event Handlers
