@@ -24,7 +24,8 @@ help:
 	@echo "  make say TEXT=\"...\"      Speak text directly (VOICE=, SPEED=)"
 	@echo "  make talk                listen -> stt -> tts (one command)"
 	@echo "  make voice-demo          Interactive TTS voice browser"
-	@echo "  make stt-demo            Interactive STT recorder with waveform"
+	@echo "  make stt-demo            Interactive STT recorder (TUI)"
+	@echo "  make record              Simple CLI recorder with transcription"
 	@echo "  make test                Run speech tests"
 	@echo
 	@echo "Model sets: minimal | fallback | default | all"
@@ -134,8 +135,12 @@ voice-demo:
 	@cd speech && ./../scripts/speech-venv.sh run demo.py
 
 stt-demo:
-	@# Interactive STT recorder with waveform display
+	@# Interactive STT recorder with waveform display (TUI)
 	@cd speech && ./../scripts/speech-venv.sh run stt_demo.py
+
+record:
+	@# Simple CLI recorder with transcription
+	@cd speech && ./../scripts/speech-venv.sh run record_cli.py
 
 test:
 	@echo "==> Installing speech dev deps + running tests"
