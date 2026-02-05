@@ -25,7 +25,47 @@ sys.path.insert(0, str(Path(__file__).parent))
 import numpy as np
 import soundfile as sf
 
-# Voice definitions grouped by language
+# =============================================================================
+# Constants
+# =============================================================================
+
+# ANSI color codes
+GREEN = "\033[1;32m"
+YELLOW = "\033[1;33m"
+DIM = "\033[2m"
+RESET = "\033[0m"
+CLEAR_SCREEN = "\033[2J\033[H"
+
+# Box drawing
+BOX_WIDTH = 63
+
+# Language display names (for greeting template)
+LANG_NAMES = {
+    "en-us": "an American",
+    "en-gb": "a British",
+    "ja": "a Japanese",
+    "zh": "a Chinese",
+    "es": "a Spanish",
+    "fr": "a French",
+    "hi": "a Hindi",
+    "it": "an Italian",
+    "pt-br": "a Brazilian Portuguese",
+}
+
+# TODO: kokoro-onnx currently only supports en-us/en-gb phonemization.
+# To enable native language greetings, need either:
+#   1. Switch to full 'kokoro' package (requires spacy, broken on Python 3.13+)
+#   2. Wait for kokoro-onnx to add multi-language G2P support
+#   3. Use a separate phonemizer like 'misaki' (pip install misaki[ja] misaki[zh])
+GREETING_TEMPLATE = "Hi! I'm {name}, {lang_name} {desc}. How can I help you today?"
+
+# Native greetings (for future use when multi-language support is available):
+# NATIVE_GREETINGS = {
+#     "ja": "こんにちは！私は{name}です、{desc}です。今日はどうお手伝いしましょうか？",
+#     "zh": "你好！我是{name}，{desc}。今天我能帮您什么？",
+# }
+
+# Voice definitions: (lang_name, lang_code, [(voice_id, name, desc), ...])
 LANGUAGES = [
     ("American English", "en-us", [
         ("af_alloy", "Alloy", "Female"),
@@ -60,71 +100,72 @@ LANGUAGES = [
         ("bm_lewis", "Lewis", "Male"),
     ]),
     ("Japanese", "ja", [
-        ("jf_alpha", "Alpha", "女性"),
-        ("jf_gongitsune", "Gongitsune", "女性"),
-        ("jf_nezumi", "Nezumi", "女性"),
-        ("jf_tebukuro", "Tebukuro", "女性"),
-        ("jm_kumo", "Kumo", "男性"),
+        ("jf_alpha", "Alpha", "Female"),
+        ("jf_gongitsune", "Gongitsune", "Female"),
+        ("jf_nezumi", "Nezumi", "Female"),
+        ("jf_tebukuro", "Tebukuro", "Female"),
+        ("jm_kumo", "Kumo", "Male"),
     ]),
     ("Chinese", "zh", [
-        ("zf_xiaobei", "Xiaobei", "女声"),
-        ("zf_xiaoni", "Xiaoni", "女声"),
-        ("zf_xiaoxiao", "Xiaoxiao", "女声"),
-        ("zf_xiaoyi", "Xiaoyi", "女声"),
-        ("zm_yunjian", "Yunjian", "男声"),
-        ("zm_yunxi", "Yunxi", "男声"),
-        ("zm_yunxia", "Yunxia", "男声"),
-        ("zm_yunyang", "Yunyang", "男声"),
+        ("zf_xiaobei", "Xiaobei", "Female"),
+        ("zf_xiaoni", "Xiaoni", "Female"),
+        ("zf_xiaoxiao", "Xiaoxiao", "Female"),
+        ("zf_xiaoyi", "Xiaoyi", "Female"),
+        ("zm_yunjian", "Yunjian", "Male"),
+        ("zm_yunxi", "Yunxi", "Male"),
+        ("zm_yunxia", "Yunxia", "Male"),
+        ("zm_yunyang", "Yunyang", "Male"),
     ]),
     ("Spanish", "es", [
-        ("ef_dora", "Dora", "Femenina"),
-        ("em_alex", "Alex", "Masculina"),
-        ("em_santa", "Santa", "Masculina"),
+        ("ef_dora", "Dora", "Female"),
+        ("em_alex", "Alex", "Male"),
+        ("em_santa", "Santa", "Male"),
     ]),
     ("French", "fr", [
-        ("ff_siwis", "Siwis", "Féminine"),
+        ("ff_siwis", "Siwis", "Female"),
     ]),
     ("Hindi", "hi", [
-        ("hf_alpha", "Alpha", "महिला"),
-        ("hf_beta", "Beta", "महिला"),
-        ("hm_omega", "Omega", "पुरुष"),
-        ("hm_psi", "Psi", "पुरुष"),
+        ("hf_alpha", "Alpha", "Female"),
+        ("hf_beta", "Beta", "Female"),
+        ("hm_omega", "Omega", "Male"),
+        ("hm_psi", "Psi", "Male"),
     ]),
     ("Italian", "it", [
-        ("if_sara", "Sara", "Femminile"),
-        ("im_nicola", "Nicola", "Maschile"),
+        ("if_sara", "Sara", "Female"),
+        ("im_nicola", "Nicola", "Male"),
     ]),
     ("Portuguese", "pt-br", [
-        ("pf_dora", "Dora", "Feminina"),
-        ("pm_alex", "Alex", "Masculina"),
-        ("pm_santa", "Santa", "Masculina"),
+        ("pf_dora", "Dora", "Female"),
+        ("pm_alex", "Alex", "Male"),
+        ("pm_santa", "Santa", "Male"),
     ]),
 ]
 
-# Greetings for each language
-# TODO: kokoro-onnx currently only supports en-us/en-gb phonemization.
-# To enable native language greetings, need either:
-#   1. Switch to full 'kokoro' package (requires spacy, broken on Python 3.13+)
-#   2. Wait for kokoro-onnx to add multi-language G2P support
-#   3. Use a separate phonemizer like 'misaki' (pip install misaki[ja] misaki[zh])
-# For now, non-English voices speak English text.
-# {name} = voice name, {desc} = voice type (e.g., "Female", "Male"), {lang_name} = language name
-GREETINGS = {
-    "en-us": "Hi! I'm {name}, an American {desc}. How can I help you today?",
-    "en-gb": "Hello! I'm {name}, a British {desc}. How may I assist you today?",
-    # Native greetings (uncomment when multi-language support is available):
-    # "ja": "こんにちは！私は{name}です、{desc}です。今日はどうお手伝いしましょうか？",
-    # "zh": "你好！我是{name}，{desc}。今天我能帮您什么？",
-    # Fallback English greetings for non-English voices:
-    "ja": "Hi! I'm {name}, a Japanese {desc}. How can I help you today?",
-    "zh": "Hi! I'm {name}, a Chinese {desc}. How can I help you today?",
-    "es": "Hi! I'm {name}, a Spanish {desc}. How can I help you today?",
-    "fr": "Hi! I'm {name}, a French {desc}. How can I help you today?",
-    "hi": "Hi! I'm {name}, a Hindi {desc}. How can I help you today?",
-    "it": "Hi! I'm {name}, an Italian {desc}. How can I help you today?",
-    "pt-br": "Hi! I'm {name}, a Brazilian Portuguese {desc}. How can I help you today?",
+# Key bindings: keys -> action name
+KEY_BINDINGS = {
+    # Quit
+    'q': 'quit',
+    '\x03': 'quit',  # Ctrl+C
+    # Voice navigation
+    'j': 'next_voice',
+    '\x1b[B': 'next_voice',  # Down arrow
+    'k': 'prev_voice',
+    '\x1b[A': 'prev_voice',  # Up arrow
+    # Language navigation
+    'J': 'next_lang',
+    '\t': 'next_lang',  # Tab
+    'K': 'prev_lang',
+    '\x1b[Z': 'prev_lang',  # Shift+Tab
+    # Playback
+    ' ': 'toggle_pause',
+    'r': 'play',
+    '\r': 'play',  # Enter
 }
 
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
 
 def get_key_nonblocking(timeout=0.1):
     """Read a single keypress with timeout. Returns None if no key pressed."""
@@ -150,202 +191,227 @@ def stop_audio():
     subprocess.run(['killall', 'afplay'], stderr=subprocess.DEVNULL)
 
 
-def generate_audio(voice_id: str, name: str, desc: str, lang: str) -> str:
-    """Generate TTS audio and return temp file path."""
-    import tts
-
-    greeting = GREETINGS.get(lang, GREETINGS["en-us"]).format(name=name, desc=desc)
-    # kokoro-onnx only supports en-us/en-gb phonemization
-    tts_lang = "en-gb" if lang == "en-gb" else "en-us"
-    samples, sample_rate = tts.synthesize(greeting, voice=voice_id, lang=tts_lang)
-
-    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
-        tmp_path = f.name
-        sf.write(tmp_path, samples, sample_rate)
-
-    return tmp_path
-
-
 def play_audio(wav_path: str) -> subprocess.Popen:
     """Start playing audio, return process handle."""
     return subprocess.Popen(['afplay', wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
+def generate_audio(voice_id: str, name: str, desc: str, lang_code: str) -> str:
+    """Generate TTS audio and return temp file path."""
+    import tts
+
+    lang_name = LANG_NAMES.get(lang_code, "a")
+    greeting = GREETING_TEMPLATE.format(name=name, lang_name=lang_name, desc=desc)
+
+    # kokoro-onnx only supports en-us/en-gb phonemization
+    tts_lang = "en-gb" if lang_code == "en-gb" else "en-us"
+    samples, sample_rate = tts.synthesize(greeting, voice=voice_id, lang=tts_lang)
+
+    with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+        sf.write(f.name, samples, sample_rate)
+        return f.name
+
+
+def box_line(content="", style="middle"):
+    """Create a box line with proper padding."""
+    styles = {
+        "top": ("╔", "═", "╗"),
+        "middle": ("║", " ", "║"),
+        "sep": ("╟", "─", "╢"),
+        "div": ("╠", "═", "╣"),
+        "bottom": ("╚", "═", "╝"),
+    }
+    left, fill, right = styles[style]
+    if style in ("top", "bottom", "sep", "div"):
+        return left + fill * BOX_WIDTH + right
+    # For content lines, handle ANSI codes in length calculation
+    visible_len = len(content.replace(GREEN, "").replace(YELLOW, "").replace(DIM, "").replace(RESET, ""))
+    padding = BOX_WIDTH - visible_len - 1
+    return f"{left} {content}{' ' * max(0, padding)}{right}"
+
+
 def display(languages, lang_idx, voice_idx, played, paused=False):
     """Display the voice browser UI."""
-    print('\033[2J\033[H', end='')  # Clear screen
+    print(CLEAR_SCREEN, end='')
 
     # Header
-    print("╔" + "═" * 63 + "╗")
-    title = "  Kokoro TTS Voice Demo"
+    print(box_line(style="top"))
+    title = "Kokoro TTS Voice Demo"
     if paused:
-        title += "  \033[1;33m[PAUSED]\033[0m"
-    print("║" + title.center(72) + "║")
-    print("╠" + "═" * 63 + "╣")
-
-    # Language tabs
-    tabs = []
-    for i, (lang_name, _, voices) in enumerate(languages):
-        if i == lang_idx:
-            tabs.append(f"\033[1;32m[{lang_name}]\033[0m")
-        else:
-            tabs.append(f" {lang_name} ")
-
-    tab_line = " ".join(tabs)
-    # Truncate if too long
-    if len(tab_line) > 100:
-        tab_line = "  ".join([f"{'>' if i == lang_idx else ' '}{l[0][:3]}" for i, l in enumerate(languages)])
-
-    print("║ " + "Tab/Shift+Tab to switch languages".ljust(62) + "║")
-    print("╟" + "─" * 63 + "╢")
+        title += f"  {YELLOW}[PAUSED]{RESET}"
+    print(box_line(title.center(BOX_WIDTH - 2 + (len(YELLOW) + len(RESET) if paused else 0))))
+    print(box_line(style="div"))
+    print(box_line("Tab/Shift+Tab to switch languages"))
+    print(box_line(style="sep"))
 
     # Current language info
     lang_name, lang_code, voices = languages[lang_idx]
-    print(f"║ \033[1m{lang_name}\033[0m ({len(voices)} voices)".ljust(72) + "║")
-    print("╟" + "─" * 63 + "╢")
+    print(box_line(f"\033[1m{lang_name}\033[0m ({len(voices)} voices)"))
+    print(box_line(style="sep"))
 
     # Voice list
     for i, (vid, name, desc) in enumerate(voices):
-        key = (lang_idx, i)
-        if i == voice_idx:
-            marker = "\033[1;32m▶\033[0m"
-            line = f"\033[1;32m{vid:<15} {name:<12} {desc}\033[0m"
-        elif key in played:
-            marker = "✓"
-            line = f"\033[2m{vid:<15} {name:<12} {desc}\033[0m"
-        else:
-            marker = " "
-            line = f"{vid:<15} {name:<12} {desc}"
+        is_current = (i == voice_idx)
+        is_played = (lang_idx, i) in played
 
-        print(f"║ {marker} {line}".ljust(72) + "║")
+        if is_current:
+            line = f"{GREEN}▶ {vid:<15} {name:<12} {desc}{RESET}"
+        elif is_played:
+            line = f"✓ {DIM}{vid:<15} {name:<12} {desc}{RESET}"
+        else:
+            line = f"  {vid:<15} {name:<12} {desc}"
+
+        print(box_line(line))
 
     # Pad to fill space
     for _ in range(max(0, 12 - len(voices))):
-        print("║" + " " * 63 + "║")
+        print(box_line())
 
     # Footer
-    print("╟" + "─" * 63 + "╢")
+    print(box_line(style="sep"))
     if paused:
-        print("║  \033[33mSpace resume\033[0m  j/k Nav  J/K or Tab Lang  r Play  q Quit".ljust(73) + "║")
+        footer = f"{YELLOW}Space resume{RESET}  j/k Nav  J/K or Tab Lang  r Play  q Quit"
     else:
-        print("║  Space pause  j/k Nav  J/K or Tab Lang  r Play  q Quit".ljust(64) + "║")
-    print("╚" + "═" * 63 + "╝")
+        footer = "Space pause  j/k Nav  J/K or Tab Lang  r Play  q Quit"
+    print(box_line(footer))
+    print(box_line(style="bottom"))
     sys.stdout.flush()
 
 
+# =============================================================================
+# Main
+# =============================================================================
+
+class DemoState:
+    """Encapsulate demo state to reduce globals."""
+
+    def __init__(self):
+        self.lang_idx = 0
+        self.voice_idx = 0
+        self.played = set()
+        self.audio_proc = None
+        self.tmp_path = None
+        self.pending_play = False
+        self.idle_count = 0
+        self.paused = False
+
+    def cleanup(self):
+        """Clean up audio process and temp file."""
+        if self.audio_proc:
+            self.audio_proc.terminate()
+            self.audio_proc = None
+        if self.tmp_path and os.path.exists(self.tmp_path):
+            os.unlink(self.tmp_path)
+            self.tmp_path = None
+
+    def get_current_voices(self):
+        """Get voices list for current language."""
+        return LANGUAGES[self.lang_idx][2]
+
+    def get_current_voice(self):
+        """Get current voice tuple (id, name, desc) and lang_code."""
+        _, lang_code, voices = LANGUAGES[self.lang_idx]
+        return voices[self.voice_idx], lang_code
+
+    def play_current(self):
+        """Generate and play audio for current voice."""
+        self.cleanup()
+        stop_audio()
+        self.pending_play = False
+
+        (voice_id, name, desc), lang_code = self.get_current_voice()
+        self.played.add((self.lang_idx, self.voice_idx))
+        display(LANGUAGES, self.lang_idx, self.voice_idx, self.played, self.paused)
+
+        self.tmp_path = generate_audio(voice_id, name, desc, lang_code)
+        self.audio_proc = play_audio(self.tmp_path)
+
+    def navigate(self, new_lang_idx, new_voice_idx):
+        """Navigate to a new voice."""
+        stop_audio()
+        self.cleanup()
+        self.lang_idx = new_lang_idx
+        self.voice_idx = new_voice_idx
+        self.pending_play = not self.paused
+        self.idle_count = 0
+        display(LANGUAGES, self.lang_idx, self.voice_idx, self.played, self.paused)
+
+    def handle_action(self, action):
+        """Handle a named action. Returns False to quit."""
+        voices = self.get_current_voices()
+
+        if action == 'quit':
+            return False
+
+        elif action == 'next_voice':
+            self.navigate(self.lang_idx, (self.voice_idx + 1) % len(voices))
+
+        elif action == 'prev_voice':
+            self.navigate(self.lang_idx, (self.voice_idx - 1) % len(voices))
+
+        elif action == 'next_lang':
+            self.navigate((self.lang_idx + 1) % len(LANGUAGES), 0)
+
+        elif action == 'prev_lang':
+            self.navigate((self.lang_idx - 1) % len(LANGUAGES), 0)
+
+        elif action == 'toggle_pause':
+            self.paused = not self.paused
+            if self.paused:
+                stop_audio()
+            display(LANGUAGES, self.lang_idx, self.voice_idx, self.played, self.paused)
+
+        elif action == 'play':
+            self.play_current()
+
+        return True
+
+
 def main():
-    lang_idx = 0
-    voice_idx = 0
-    played = set()  # Track played voices as (lang_idx, voice_idx)
-    audio_proc = None
-    tmp_path = None
-    pending_play = False  # Flag to play after navigation settles
-    idle_count = 0  # Count idle cycles to detect settling
-    paused = False  # Pause auto-advance
-
-    def cleanup():
-        nonlocal audio_proc, tmp_path
-        if audio_proc:
-            audio_proc.terminate()
-            audio_proc = None
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
-            tmp_path = None
-
-    def play_current():
-        nonlocal audio_proc, tmp_path, pending_play
-        cleanup()
-        stop_audio()
-        pending_play = False
-
-        _, lang_code, voices = LANGUAGES[lang_idx]
-        voice_id, name, desc = voices[voice_idx]
-
-        played.add((lang_idx, voice_idx))
-        display(LANGUAGES, lang_idx, voice_idx, played, paused)
-
-        tmp_path = generate_audio(voice_id, name, desc, lang_code)
-        audio_proc = play_audio(tmp_path)
-
-    def navigate(new_lang_idx, new_voice_idx):
-        nonlocal lang_idx, voice_idx, pending_play, idle_count
-        stop_audio()
-        cleanup()
-        lang_idx = new_lang_idx
-        voice_idx = new_voice_idx
-        pending_play = not paused  # Only auto-play if not paused
-        idle_count = 0
-        display(LANGUAGES, lang_idx, voice_idx, played, paused)
+    state = DemoState()
 
     try:
-        display(LANGUAGES, lang_idx, voice_idx, played, paused)
-        play_current()
+        display(LANGUAGES, state.lang_idx, state.voice_idx, state.played, state.paused)
+        state.play_current()
 
         while True:
-            key = get_key_nonblocking(timeout=0.05)  # Faster polling for responsive navigation
+            key = get_key_nonblocking(timeout=0.05)
 
             # Check if audio finished (auto-advance if not paused)
-            if audio_proc and audio_proc.poll() is not None:
-                if not paused:
-                    _, _, voices = LANGUAGES[lang_idx]
-                    navigate(lang_idx, (voice_idx + 1) % len(voices))
-                    pending_play = True
-                    idle_count = 3  # Play immediately after audio ends
+            if state.audio_proc and state.audio_proc.poll() is not None:
+                if not state.paused:
+                    voices = state.get_current_voices()
+                    state.navigate(state.lang_idx, (state.voice_idx + 1) % len(voices))
+                    state.pending_play = True
+                    state.idle_count = 3
                 else:
-                    audio_proc = None  # Clear finished process
+                    state.audio_proc = None
 
             # If pending play and idle for a bit, start playing
-            if pending_play and not paused:
-                idle_count += 1
-                if idle_count > 3:  # ~150ms of no input
-                    play_current()
+            if state.pending_play and not state.paused:
+                state.idle_count += 1
+                if state.idle_count > 3:
+                    state.play_current()
 
             if key is None:
                 continue
 
-            idle_count = 0  # Reset on any key
-            _, _, voices = LANGUAGES[lang_idx]
+            state.idle_count = 0
+            action = KEY_BINDINGS.get(key)
 
-            if key in ('q', '\x03'):  # q, Ctrl+C
-                cleanup()
-                stop_audio()
-                print("\033[2J\033[H", end='')  # Clear screen
-                print("Done!")
-                return 0
-
-            elif key == '\x1b':  # Plain Escape
-                pass
-
-            elif key == '\x1b[A' or key == 'k':  # Up, k
-                navigate(lang_idx, (voice_idx - 1) % len(voices))
-
-            elif key == '\x1b[B' or key == 'j':  # Down, j
-                navigate(lang_idx, (voice_idx + 1) % len(voices))
-
-            elif key == '\x1b[Z' or key == 'K':  # Shift+Tab or K
-                new_lang = (lang_idx - 1) % len(LANGUAGES)
-                navigate(new_lang, 0)
-
-            elif key == '\t' or key == 'J':  # Tab or J
-                new_lang = (lang_idx + 1) % len(LANGUAGES)
-                navigate(new_lang, 0)
-
-            elif key == ' ':  # Space - toggle pause
-                paused = not paused
-                if paused:
-                    stop_audio()
-                display(LANGUAGES, lang_idx, voice_idx, played, paused)
-
-            elif key == 'r' or key == '\r':  # r or Enter - play current
-                play_current()
+            if action and not state.handle_action(action):
+                break
 
     except KeyboardInterrupt:
         pass
     finally:
-        cleanup()
+        state.cleanup()
         stop_audio()
-        print("\033[2J\033[H", end='')
+        print(CLEAR_SCREEN, end='')
+        print("Done!")
+
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main() or 0)
+    sys.exit(main())
