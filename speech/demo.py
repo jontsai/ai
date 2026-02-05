@@ -36,6 +36,21 @@ from textual.worker import Worker, WorkerState
 import numpy as np
 import soundfile as sf
 
+
+# =============================================================================
+# Custom Input with readline bindings
+# =============================================================================
+
+class ReadlineInput(Input):
+    """Input widget with readline-style keybindings."""
+
+    BINDINGS = [
+        Binding("ctrl+b", "cursor_left", "Cursor left", show=False),
+        Binding("ctrl+f", "cursor_right", "Cursor right", show=False),
+        # ctrl+a and ctrl+e already work in Textual Input
+    ]
+
+
 # =============================================================================
 # Constants
 # =============================================================================
@@ -251,7 +266,7 @@ class VoiceDemoApp(App):
             # Text input section
             with Vertical(id="text-section"):
                 yield Label("Text to speak (use {name}, {lang_name}, {desc} for placeholders):", id="text-label")
-                yield Input(value=DEFAULT_TEXT, id="text-input", select_on_focus=False)
+                yield ReadlineInput(value=DEFAULT_TEXT, id="text-input", select_on_focus=False)
 
             # Language selector and status
             with Horizontal(id="controls-row"):
