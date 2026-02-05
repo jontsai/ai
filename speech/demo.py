@@ -140,6 +140,50 @@ def clear_line():
     print('\r\033[K', end='', flush=True)
 
 
+def clear_screen():
+    """Clear screen and move cursor to top."""
+    print('\033[2J\033[H', end='', flush=True)
+
+
+def display_voice_list(voices, current_idx, visible=15):
+    """Display a scrolling list of voices with current highlighted."""
+    total = len(voices)
+
+    # Calculate visible window
+    half = visible // 2
+    start = max(0, current_idx - half)
+    end = min(total, start + visible)
+    if end == total:
+        start = max(0, end - visible)
+
+    clear_screen()
+    print("=" * 65)
+    print("  Kokoro TTS Voice Demo")
+    print("=" * 65)
+    print("  j/→ = Next   k/← = Prev   r = Replay   q = Quit   1-9 = Jump")
+    print("-" * 65)
+
+    for i in range(start, end):
+        voice_id, name, desc, lang = voices[i]
+        marker = "▶" if i == current_idx else " "
+        num = f"{i+1:2}"
+
+        # Truncate description if too long
+        max_desc = 35
+        if len(desc) > max_desc:
+            desc = desc[:max_desc-2] + ".."
+
+        # Highlight current voice
+        if i == current_idx:
+            print(f"\033[1;32m{marker} {num}. {voice_id:<15} {name:<12} {desc}\033[0m")
+        else:
+            print(f"{marker} {num}. {voice_id:<15} {name:<12} {desc}")
+
+    print("-" * 65)
+    print(f"  [{current_idx + 1}/{total}] Auto-advances when audio finishes")
+    print("=" * 65, flush=True)
+
+
 def generate_audio(voice_id: str, name: str, desc: str, lang: str) -> str:
     """Generate TTS audio and return temp file path."""
     import tts
@@ -160,18 +204,6 @@ def play_audio(wav_path: str) -> subprocess.Popen:
 
 
 def main():
-    print("\033[2J\033[H", end='')  # Clear screen
-    print("=" * 60)
-    print("  Kokoro TTS Voice Demo")
-    print("=" * 60)
-    print()
-    print("Controls:")
-    print("  j/n/→/Space = Next    k/p/← = Previous    r = Replay")
-    print("  q/Esc = Quit          1-9 = Jump to voice")
-    print()
-    print("Audio auto-advances. Press j/k to skip.")
-    print("-" * 60)
-
     idx = 0
     total = len(VOICES)
     audio_proc = None
@@ -190,9 +222,8 @@ def main():
         while True:
             voice_id, name, desc, lang = VOICES[idx]
 
-            # Display current voice
-            clear_line()
-            print(f"\r[{idx + 1}/{total}] {voice_id}: {name} - {desc}", flush=True)
+            # Display voice list with current highlighted
+            display_voice_list(VOICES, idx)
 
             # Generate and play audio
             cleanup()
