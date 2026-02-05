@@ -35,8 +35,14 @@ while [[ $# -gt 0 ]]; do
       echo "  -v, --voice   Voice ID (default: af_heart)"
       echo "  -s, --speed   Speed multiplier (default: 1.0)"
       echo ""
-      echo "Voices: af_heart, af_bella, af_sarah, am_adam, bf_emma, bm_george, ..."
-      echo "See: https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md"
+      echo "Popular voices:"
+      echo "  American: af_heart, af_bella, af_sarah, am_adam, am_michael"
+      echo "  British:  bf_emma, bf_alice, bm_george, bm_daniel"
+      echo "  Japanese: jf_alpha, jm_kumo"
+      echo "  Chinese:  zf_xiaoxiao, zm_yunxi"
+      echo ""
+      echo "Full list: cat speech/voices/README.md"
+      echo "Demo all:  make voice-demo"
       exit 0
       ;;
     -*)

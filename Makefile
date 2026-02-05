@@ -16,7 +16,19 @@ help:
 	@echo "  make rm MODEL=...        Remove a model"
 	@echo "  make prune               Prune unused layers"
 	@echo
+	@echo "Speech (TTS/STT):"
+	@echo "  make speech-doctor       Setup speech venv and check deps"
+	@echo "  make listen              Record mic -> speech/buffer/in.wav"
+	@echo "  make stt                 Transcribe speech/buffer/in.wav -> out.txt"
+	@echo "  make tts                 Speak speech/buffer/out.txt -> out.wav"
+	@echo "  make say TEXT=\"...\"      Speak text directly (VOICE=, SPEED=)"
+	@echo "  make talk                listen -> stt -> tts (one command)"
+	@echo "  make voice-demo          Interactive voice demo (j/k to navigate)"
+	@echo "  make voice-demo-all      Play all 54 voices sequentially"
+	@echo "  make test                Run speech tests"
+	@echo
 	@echo "Model sets: minimal | fallback | default | all"
+	@echo "Voices: see speech/voices/README.md (54 voices, 9 languages)"
 
 doctor:
 	@echo "==> 1) Checking ollama binary"
@@ -116,6 +128,14 @@ say:
 talk:
 	@# listen -> stt -> tts (one command)
 	@./scripts/talk.sh
+
+voice-demo:
+	@# Interactive voice demo with j/k navigation
+	@cd speech && ./../scripts/speech-venv.sh run demo.py
+
+voice-demo-all:
+	@# Play all 54 voices sequentially (non-interactive)
+	@./scripts/voice-demo.sh
 
 test:
 	@echo "==> Installing speech dev deps + running tests"
