@@ -39,6 +39,11 @@ check_system_deps() {
     echo "  Install: brew install ffmpeg"
     exit 1
   fi
+  if ! command -v espeak-ng >/dev/null 2>&1; then
+    echo "ERROR: espeak-ng not found (required for non-English TTS)"
+    echo "  Install: brew install espeak-ng"
+    exit 1
+  fi
 }
 
 # Ensure venv exists AND dependencies are installed

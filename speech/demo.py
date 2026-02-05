@@ -56,21 +56,28 @@ class ReadlineInput(Input):
 # Constants
 # =============================================================================
 
+# Language-specific greetings for the demo
 # Placeholders: {name}, {nationality_article}, {nationality}, {gender}, {notes}
-DEFAULT_TEXT = "Hi! I'm {name}, {nationality_article} {nationality} {gender}. How can I help you today?"
-
-# Mapping from voice_id prefix to (lang_code, article, nationality)
-LANG_PREFIX_MAP = {
-    "a": ("en-us", "an", "American"),
-    "b": ("en-gb", "a", "British"),
-    "j": ("ja", "a", "Japanese"),
-    "z": ("zh", "a", "Chinese"),
-    "e": ("es", "a", "Spanish"),
-    "f": ("fr", "a", "French"),
-    "h": ("hi", "a", "Hindi"),
-    "i": ("it", "an", "Italian"),
-    "p": ("pt-br", "a", "Brazilian Portuguese"),
+LANG_GREETINGS = {
+    "a": "Hi! I'm {name}, {nationality_article} {nationality} {gender}. How can I help you today?",
+    "b": "Hello! I'm {name}, {nationality_article} {nationality} {gender}. How may I assist you?",
+    "j": "こんにちは！私は{name}です。{nationality}の{gender}です。今日はどのようにお手伝いできますか？",
+    "z": "你好！我是{name}，{nationality_article}{nationality}{gender}。今天我能帮你什么忙？",
+    "e": "¡Hola! Soy {name}, {nationality_article} {gender} {nationality}. ¿En qué puedo ayudarte hoy?",
+    "f": "Bonjour ! Je suis {name}, {nationality_article} {gender} {nationality}. Comment puis-je vous aider ?",
+    "h": "नमस्ते! मैं {name} हूं, {nationality_article} {nationality} {gender}। आज मैं आपकी कैसे मदद कर सकती हूं?",
+    "i": "Ciao! Sono {name}, {nationality_article} {gender} {nationality}. Come posso aiutarti oggi?",
+    "p": "Olá! Eu sou {name}, {nationality_article} {gender} {nationality}. Como posso ajudá-lo hoje?",
 }
+DEFAULT_TEXT = LANG_GREETINGS["a"]
+
+
+def get_greeting_for_lang(lang_prefix: str) -> str:
+    """Get the greeting template for a language prefix."""
+    return LANG_GREETINGS.get(lang_prefix, DEFAULT_TEXT)
+
+# Import language metadata from tts module (single source of truth)
+from tts import VOICE_LANG_META, get_article
 
 
 @dataclass
@@ -92,17 +99,22 @@ class Voice:
     @property
     def lang_code(self) -> str:
         """Derive language code from voice_id[0]."""
-        return LANG_PREFIX_MAP.get(self.voice_id[0], ("en-us", "a", ""))[0]
-
-    @property
-    def nationality_article(self) -> str:
-        """Derive article (a/an) for nationality from voice_id[0]."""
-        return LANG_PREFIX_MAP.get(self.voice_id[0], ("en-us", "a", ""))[1]
+        return VOICE_LANG_META.get(self.voice_id[0], ("en-us", ""))[0]
 
     @property
     def nationality(self) -> str:
         """Derive nationality from voice_id[0]."""
-        return LANG_PREFIX_MAP.get(self.voice_id[0], ("en-us", "a", ""))[2]
+        return VOICE_LANG_META.get(self.voice_id[0], ("en-us", ""))[1]
+
+    @property
+    def nationality_article(self) -> str:
+        """Compute article (a/an) based on nationality's first letter."""
+        return get_article(self.nationality)
+
+    @property
+    def greeting(self) -> str:
+        """Get the language-appropriate greeting template."""
+        return get_greeting_for_lang(self.voice_id[0])
 
 
 def V(voice_id: str, notes: str = "") -> Voice:
@@ -152,7 +164,7 @@ LANGUAGES = [
         V("jf_tebukuro"),
         V("jm_kumo"),
     ]),
-    ("Chinese", "zh", [
+    ("Chinese", "cmn", [
         V("zf_xiaobei"),
         V("zf_xiaoni"),
         V("zf_xiaoxiao"),
@@ -167,7 +179,7 @@ LANGUAGES = [
         V("em_alex"),
         V("em_santa"),
     ]),
-    ("French", "fr", [
+    ("French", "fr-fr", [
         V("ff_siwis"),
     ]),
     ("Hindi", "hi", [
@@ -210,9 +222,8 @@ def generate_audio(text: str, voice_id: str, lang_code: str) -> str:
     """Generate TTS audio and return temp file path."""
     import tts
 
-    # kokoro-onnx only supports en-us/en-gb phonemization
-    tts_lang = "en-gb" if lang_code == "en-gb" else "en-us"
-    samples, sample_rate = tts.synthesize(text, voice=voice_id, lang=tts_lang)
+    # Use the lang_code directly - tts.py handles espeak-ng codes
+    samples, sample_rate = tts.synthesize(text, voice=voice_id, lang=lang_code)
 
     fd, tmp_path = tempfile.mkstemp(suffix='.wav')
     os.close(fd)
@@ -455,6 +466,12 @@ class VoiceDemoApp(App):
             self._cleanup_audio()
             stop_audio()
             self._update_status("")
+            # Update text input with language-appropriate greeting
+            _, _, voices = LANGUAGES[self.lang_idx]
+            if voices:
+                lang_prefix = voices[0].voice_id[0]
+                text_input = self.query_one("#text-input", Input)
+                text_input.value = get_greeting_for_lang(lang_prefix)
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle voice selection (Enter key on table)."""
@@ -467,9 +484,14 @@ class VoiceDemoApp(App):
         self._play_current()
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        """Restore default text if input is cleared."""
+        """Restore language-appropriate default text if input is cleared."""
         if event.input.id == "text-input" and event.value == "":
-            event.input.value = DEFAULT_TEXT
+            _, _, voices = LANGUAGES[self.lang_idx]
+            if voices:
+                lang_prefix = voices[0].voice_id[0]
+                event.input.value = get_greeting_for_lang(lang_prefix)
+            else:
+                event.input.value = DEFAULT_TEXT
 
     # -------------------------------------------------------------------------
     # Actions

@@ -124,6 +124,7 @@ _models_for_set:
 speech-doctor:
 	@echo "==> Checking speech dependencies"
 	@command -v ffmpeg >/dev/null || { echo "ERROR: ffmpeg not found (brew install ffmpeg)"; exit 1; }
+	@command -v espeak-ng >/dev/null || { echo "ERROR: espeak-ng not found (brew install espeak-ng)"; exit 1; }
 	@python3 -V
 	@echo
 	@echo "==> Creating venv (if missing) and installing speech deps"

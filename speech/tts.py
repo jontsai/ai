@@ -17,8 +17,38 @@ import soundfile as sf
 
 SAMPLE_RATE = 24000
 DEFAULT_VOICE = "af_heart"
-DEFAULT_LANG = "en-us"
 DEFAULT_SPEED = 1.0
+
+# Language metadata for voice prefixes
+# Maps voice prefix -> (lang_code, nationality)
+# lang_code uses espeak-ng codes (e.g., 'cmn' for Mandarin, not 'zh')
+VOICE_LANG_META = {
+    "a": ("en-us", "American"),
+    "b": ("en-gb", "British"),
+    "j": ("ja", "Japanese"),
+    "z": ("cmn", "Chinese"),
+    "e": ("es", "Spanish"),
+    "f": ("fr-fr", "French"),
+    "h": ("hi", "Hindi"),
+    "i": ("it", "Italian"),
+    "p": ("pt-br", "Brazilian Portuguese"),
+}
+
+
+def get_article(word: str) -> str:
+    """Return 'an' if word starts with a vowel sound, else 'a'."""
+    if not word:
+        return "a"
+    return "an" if word[0].lower() in "aeiou" else "a"
+
+
+def _lang_from_voice(voice: str) -> str:
+    """Infer language code from voice ID (e.g., 'zf_xiaobei' -> 'cmn')."""
+    if voice and len(voice) >= 1:
+        prefix = voice[0].lower()
+        meta = VOICE_LANG_META.get(prefix)
+        return meta[0] if meta else "en-us"
+    return "en-us"
 
 # Backend selection: "onnx" (default) or "native"
 TTS_BACKEND = os.environ.get("TTS_BACKEND", "onnx")
@@ -54,9 +84,12 @@ def _get_onnx_instance():
     return _onnx_instance
 
 
-def _synthesize_onnx(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG, speed: float = DEFAULT_SPEED):
+def _synthesize_onnx(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, speed: float = DEFAULT_SPEED):
     """Synthesize speech using kokoro-onnx."""
     kokoro = _get_onnx_instance()
+    # Auto-detect language from voice if not specified
+    if lang is None:
+        lang = _lang_from_voice(voice)
     samples, sample_rate = kokoro.create(text, voice=voice, speed=speed, lang=lang)
     return np.asarray(samples, dtype=np.float32), sample_rate
 
@@ -74,7 +107,7 @@ def _get_native_pipeline():
     return _native_pipeline
 
 
-def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG, speed: float = DEFAULT_SPEED):
+def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, speed: float = DEFAULT_SPEED):
     """Synthesize speech using native kokoro (requires spacy)."""
     pipe = _get_native_pipeline()
     chunks = []
@@ -90,14 +123,14 @@ def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAUL
 # Public API
 # -----------------------------------------------------------------------------
 
-def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str = DEFAULT_LANG, speed: float = DEFAULT_SPEED):
+def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, speed: float = DEFAULT_SPEED):
     """
     Synthesize speech from text.
 
     Args:
         text: The text to speak.
-        voice: Voice ID (e.g., "af_heart", "af_sarah").
-        lang: Language code (e.g., "en-us").
+        voice: Voice ID (e.g., "af_heart", "zf_xiaobei").
+        lang: Language code (e.g., "en-us", "zh"). Auto-detected from voice if None.
         speed: Speed multiplier (0.5 = half, 2.0 = double).
 
     Returns:
