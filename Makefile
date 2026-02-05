@@ -24,7 +24,6 @@ help:
 	@echo "  make say TEXT=\"...\"      Speak text directly (VOICE=, SPEED=)"
 	@echo "  make talk                listen -> stt -> tts (one command)"
 	@echo "  make voice-demo          Interactive TTS voice browser"
-	@echo "  make voice-demo-all      Play all 54 voices sequentially"
 	@echo "  make stt-demo            Interactive STT recorder with waveform"
 	@echo "  make test                Run speech tests"
 	@echo
@@ -133,10 +132,6 @@ talk:
 voice-demo:
 	@# Interactive voice demo with j/k navigation
 	@cd speech && ./../scripts/speech-venv.sh run demo.py
-
-voice-demo-all:
-	@# Play all 54 voices sequentially (non-interactive)
-	@./scripts/voice-demo.sh
 
 stt-demo:
 	@# Interactive STT recorder with waveform display
