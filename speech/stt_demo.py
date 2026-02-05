@@ -344,7 +344,7 @@ class STTDemoApp(App):
         self.audio = AudioBuffer()
         self.is_recording = False
         self.is_playing = False
-        self.recording_stream = None
+        self.recording_thread = None
         self.record_start_time = 0
         self.play_position = 0
         self.last_transcribe_time = 0
@@ -459,11 +459,6 @@ class STTDemoApp(App):
     # Recording
     # -------------------------------------------------------------------------
 
-    def _recording_callback(self, indata, frames, time_info, status):
-        """Called by sounddevice for each audio block during recording."""
-        if self.is_recording:
-            self.audio.append(indata.copy())
-
     def on_select_changed(self, event) -> None:
         """Handle mic selection change."""
         if event.select.id == "mic-select":
@@ -472,7 +467,7 @@ class STTDemoApp(App):
             self._update_status(f"Mic: {mic_name}")
 
     def _start_recording(self) -> None:
-        """Start recording audio."""
+        """Start recording audio using a background thread."""
         self.audio.clear()
         self._update_segments_table()
         self.is_recording = True
@@ -482,14 +477,30 @@ class STTDemoApp(App):
         # Use selected mic or default
         device = self.selected_mic  # None means default
 
-        self.recording_stream = sd.InputStream(
-            samplerate=SAMPLE_RATE,
-            channels=CHANNELS,
-            device=device,
-            dtype=np.float32,
-            callback=self._recording_callback
-        )
-        self.recording_stream.start()
+        def record_thread():
+            """Background thread that records audio."""
+            chunk_duration = 0.1  # Record in 100ms chunks
+            chunk_samples = int(SAMPLE_RATE * chunk_duration)
+
+            while self.is_recording:
+                try:
+                    # Record a small chunk
+                    chunk = sd.rec(
+                        chunk_samples,
+                        samplerate=SAMPLE_RATE,
+                        channels=CHANNELS,
+                        device=device,
+                        dtype=np.float32
+                    )
+                    sd.wait()
+                    if self.is_recording:  # Check again after wait
+                        self.audio.append(chunk)
+                except Exception as e:
+                    # Log error but keep trying
+                    pass
+
+        self.recording_thread = threading.Thread(target=record_thread, daemon=True)
+        self.recording_thread.start()
 
         self._update_status("● Recording... Press Space to stop", "bold red")
         self._start_recording_timer()
@@ -498,10 +509,9 @@ class STTDemoApp(App):
         """Stop recording audio."""
         self.is_recording = False
 
-        if self.recording_stream:
-            self.recording_stream.stop()
-            self.recording_stream.close()
-            self.recording_stream = None
+        # Wait briefly for thread to finish
+        if hasattr(self, 'recording_thread') and self.recording_thread.is_alive():
+            self.recording_thread.join(timeout=0.5)
 
         duration = self.audio.duration
         self._update_status(f"Recorded {duration:.1f}s. Press Enter to transcribe, or p to play.")
@@ -516,11 +526,11 @@ class STTDemoApp(App):
         self._update_status(f"● Recording... [{format_time(elapsed)}] Press Space to stop", "bold red")
         self._update_waveform()
 
-        # Live transcription every N seconds
-        if self.live_transcribe_enabled and elapsed - (self.last_transcribe_time - self.record_start_time) >= LIVE_TRANSCRIBE_INTERVAL:
-            if self.audio.duration > 1.0:  # Only if we have at least 1 second
-                self.last_transcribe_time = time.time()
-                self._transcribe_live()
+        # Live transcription every N seconds (disabled for now - too slow)
+        # if self.live_transcribe_enabled and elapsed - (self.last_transcribe_time - self.record_start_time) >= LIVE_TRANSCRIBE_INTERVAL:
+        #     if self.audio.duration > 1.0:
+        #         self.last_transcribe_time = time.time()
+        #         self._transcribe_live()
 
         self.set_timer(0.1, self._start_recording_timer)
 
