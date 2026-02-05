@@ -17,7 +17,8 @@ help:
 	@echo "  make prune               Prune unused layers"
 	@echo
 	@echo "Speech (TTS/STT):"
-	@echo "  make speech-doctor       Setup speech venv and check deps"
+	@echo "  make speech-doctor       Setup speech venv, models, and check deps"
+	@echo "  make speech-models       Download TTS models (auto-run by speech-doctor)"
 	@echo "  make listen              Record mic -> speech/buffer/in.wav"
 	@echo "  make stt                 Transcribe speech/buffer/in.wav -> out.txt"
 	@echo "  make tts                 Speak speech/buffer/out.txt -> out.wav"
@@ -31,20 +32,42 @@ help:
 	@echo "Voices: see speech/voices/README.md (54 voices, 9 languages)"
 
 doctor:
-	@echo "==> 1) Checking ollama binary"
-	@command -v ollama >/dev/null || { echo "ERROR: ollama not found in PATH"; exit 1; }
-	@ollama --version
-	@echo
-	@echo "==> 2) Checking ollama server connectivity"
-	@ollama list >/dev/null || { echo "ERROR: cannot reach ollama server"; exit 1; }
-	@echo
-	@echo "==> 3) Disk sanity"
-	@./scripts/disk.sh || true
-	@echo
-	@echo "==> 4) Expected models vs installed (MODEL_SET=$(MODEL_SET))"
-	@$(MAKE) -s status MODEL_SET=$(MODEL_SET)
-	@echo
-	@echo "Doctor complete."
+	@ISSUES=0; \
+	echo "==> 1) Checking ollama binary"; \
+	if command -v ollama >/dev/null 2>&1; then \
+	  ollama --version; \
+	else \
+	  echo "MISSING: ollama not found in PATH"; \
+	  echo "  Install: https://ollama.com/download"; \
+	  ISSUES=$$((ISSUES + 1)); \
+	fi; \
+	echo; \
+	echo "==> 2) Checking ollama server connectivity"; \
+	if command -v ollama >/dev/null 2>&1 && ollama list >/dev/null 2>&1; then \
+	  echo "OK: ollama server is running"; \
+	elif command -v ollama >/dev/null 2>&1; then \
+	  echo "MISSING: ollama installed but server not running"; \
+	  echo "  Start: ollama serve"; \
+	  ISSUES=$$((ISSUES + 1)); \
+	else \
+	  echo "SKIPPED: ollama not installed"; \
+	fi; \
+	echo; \
+	echo "==> 3) Disk sanity"; \
+	./scripts/disk.sh 2>/dev/null || echo "SKIPPED: ollama not available"; \
+	echo; \
+	echo "==> 4) Expected models vs installed (MODEL_SET=$(MODEL_SET))"; \
+	if command -v ollama >/dev/null 2>&1 && ollama list >/dev/null 2>&1; then \
+	  $(MAKE) -s status MODEL_SET=$(MODEL_SET); \
+	else \
+	  echo "SKIPPED: ollama not available"; \
+	fi; \
+	echo; \
+	if [ $$ISSUES -gt 0 ]; then \
+	  echo "Doctor found $$ISSUES issue(s). Fix them and re-run."; \
+	else \
+	  echo "Doctor complete. All checks passed."; \
+	fi
 
 status:
 	@models="$$( $(MAKE) -s _models_for_set MODEL_SET=$(MODEL_SET) )"; \
@@ -106,8 +129,30 @@ speech-doctor:
 	@echo "==> Creating venv (if missing) and installing speech deps"
 	@cd speech && ./../scripts/speech-venv.sh install
 	@echo
+	@echo "==> Checking/downloading speech models"
+	@$(MAKE) -s speech-models
+	@echo
 	@echo "==> Listing audio devices (macOS avfoundation)"
 	@./scripts/record.sh devices
+
+KOKORO_MODEL_URL := https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
+SPEECH_MODELS_DIR := speech/models
+
+speech-models:
+	@# Download Kokoro TTS models if missing
+	@mkdir -p $(SPEECH_MODELS_DIR)
+	@if [ ! -f $(SPEECH_MODELS_DIR)/kokoro-v1.0.onnx ]; then \
+	  echo "Downloading kokoro-v1.0.onnx (~310MB)..."; \
+	  curl -L -o $(SPEECH_MODELS_DIR)/kokoro-v1.0.onnx $(KOKORO_MODEL_URL)/kokoro-v1.0.onnx; \
+	else \
+	  echo "kokoro-v1.0.onnx: OK"; \
+	fi
+	@if [ ! -f $(SPEECH_MODELS_DIR)/voices-v1.0.bin ]; then \
+	  echo "Downloading voices-v1.0.bin (~27MB)..."; \
+	  curl -L -o $(SPEECH_MODELS_DIR)/voices-v1.0.bin $(KOKORO_MODEL_URL)/voices-v1.0.bin; \
+	else \
+	  echo "voices-v1.0.bin: OK"; \
+	fi
 
 listen:
 	@# Record microphone to speech/in.wav (default 10s; override: DURATION=30)
