@@ -16,6 +16,7 @@ from contextlib import asynccontextmanager
 # Add CosyVoice paths
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 COSYVOICE_DIR = os.path.join(SCRIPT_DIR, "..", "speech", "cosyvoice")
+sys.path.insert(0, COSYVOICE_DIR)  # Add CosyVoice root for cosyvoice module
 sys.path.insert(0, os.path.join(COSYVOICE_DIR, "third_party", "Matcha-TTS"))
 os.chdir(COSYVOICE_DIR)
 
