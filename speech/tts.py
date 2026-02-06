@@ -9,7 +9,9 @@ Supports two backends:
 Set TTS_BACKEND=native to use the native backend when it becomes available.
 """
 import os
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import numpy as np
@@ -95,6 +97,77 @@ def _synthesize_onnx(text: str, voice: str = DEFAULT_VOICE, lang: str | None = N
 
 
 # -----------------------------------------------------------------------------
+# CosyVoice Backend (high-quality Chinese TTS)
+# -----------------------------------------------------------------------------
+
+# Path to CosyVoice setup
+_COSYVOICE_DIR = _SCRIPT_DIR / "cosyvoice"
+_COSYVOICE_VENV = _COSYVOICE_DIR / ".venv"
+_COSYVOICE_MODEL = _COSYVOICE_DIR / "pretrained_models" / "CosyVoice2-0.5B"
+
+
+def _is_cosyvoice_available() -> bool:
+    """Check if CosyVoice is set up and ready."""
+    return _COSYVOICE_VENV.exists() and _COSYVOICE_MODEL.exists()
+
+
+def _synthesize_cosyvoice(text: str, voice: str = "zh_female", speed: float = DEFAULT_SPEED):
+    """
+    Synthesize speech using CosyVoice (for Chinese).
+
+    Runs CosyVoice in its separate Python 3.10 venv via subprocess.
+    """
+    if not _is_cosyvoice_available():
+        raise FileNotFoundError(
+            "CosyVoice not set up. Run: make cosyvoice-setup"
+        )
+
+    # Create temp file for output
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+        output_path = f.name
+
+    try:
+        # Build the Python script to run in CosyVoice venv
+        python_script = f'''
+import sys
+sys.path.insert(0, 'third_party/Matcha-TTS')
+from cosyvoice.cli.cosyvoice import AutoModel
+import torchaudio
+
+cosyvoice = AutoModel(model_dir='pretrained_models/CosyVoice2-0.5B')
+
+# Add language tag for Chinese
+text = '<|zh|>' + {repr(text)}
+
+for i, j in enumerate(cosyvoice.inference_cross_lingual(text, './asset/zero_shot_prompt.wav')):
+    torchaudio.save({repr(output_path)}, j['tts_speech'], cosyvoice.sample_rate)
+    break
+'''
+
+        # Run in CosyVoice venv
+        python_bin = _COSYVOICE_VENV / "bin" / "python"
+        result = subprocess.run(
+            [str(python_bin), "-c", python_script],
+            cwd=str(_COSYVOICE_DIR),
+            capture_output=True,
+            text=True,
+            timeout=120,  # 2 minute timeout for model loading + synthesis
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"CosyVoice failed: {result.stderr}")
+
+        # Read the generated audio
+        samples, sample_rate = sf.read(output_path)
+        return np.asarray(samples, dtype=np.float32), sample_rate
+
+    finally:
+        # Clean up temp file
+        if os.path.exists(output_path):
+            os.unlink(output_path)
+
+
+# -----------------------------------------------------------------------------
 # Native Backend (kokoro with spacy) - for future use
 # -----------------------------------------------------------------------------
 
@@ -123,6 +196,11 @@ def _synthesize_native(text: str, voice: str = DEFAULT_VOICE, lang: str | None =
 # Public API
 # -----------------------------------------------------------------------------
 
+def is_cosyvoice_available() -> bool:
+    """Check if CosyVoice backend is available for Chinese TTS."""
+    return _is_cosyvoice_available()
+
+
 def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, speed: float = DEFAULT_SPEED):
     """
     Synthesize speech from text.
@@ -136,6 +214,10 @@ def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, s
     Returns:
         Tuple of (samples, sample_rate) where samples is a numpy array.
     """
+    # Route Chinese voices to CosyVoice for higher quality
+    if voice and voice[0].lower() == "z" and _is_cosyvoice_available():
+        return _synthesize_cosyvoice(text, voice, speed)
+
     if TTS_BACKEND == "native":
         return _synthesize_native(text, voice, lang, speed)
     else:

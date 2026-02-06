@@ -77,7 +77,7 @@ def get_greeting_for_lang(lang_prefix: str) -> str:
     return LANG_GREETINGS.get(lang_prefix, DEFAULT_TEXT)
 
 # Import language metadata from tts module (single source of truth)
-from tts import VOICE_LANG_META, get_article
+from tts import VOICE_LANG_META, get_article, is_cosyvoice_available
 
 
 @dataclass
@@ -115,6 +115,13 @@ class Voice:
     def greeting(self) -> str:
         """Get the language-appropriate greeting template."""
         return get_greeting_for_lang(self.voice_id[0])
+
+    @property
+    def model(self) -> str:
+        """Return the TTS model used for this voice."""
+        if self.voice_id[0] == "z" and is_cosyvoice_available():
+            return "CosyVoice"
+        return "Kokoro"
 
 
 def V(voice_id: str, notes: str = "") -> Voice:
@@ -338,7 +345,7 @@ class VoiceDemoApp(App):
         self.sub_title = "Tab to switch focus | Enter to play"
 
         table = self.query_one("#voice-table", DataTable)
-        table.add_columns("Voice ID", "Name", "Gender", "Notes", "Played")
+        table.add_columns("Voice ID", "Name", "Gender", "Model", "Notes", "Played")
         self._populate_voices()
 
         # Focus the table by default
@@ -355,7 +362,7 @@ class VoiceDemoApp(App):
         _, lang_code, voices = LANGUAGES[self.lang_idx]
         for i, voice in enumerate(voices):
             played_mark = "✓" if (self.lang_idx, i) in self.played else ""
-            table.add_row(voice.voice_id, voice.name, voice.gender, voice.notes, played_mark, key=str(i))
+            table.add_row(voice.voice_id, voice.name, voice.gender, voice.model, voice.notes, played_mark, key=str(i))
 
     def _update_status(self, text: str) -> None:
         """Update the status display."""
@@ -409,7 +416,12 @@ class VoiceDemoApp(App):
             self.tmp_path = event.worker.result
             stop_audio()
             self.audio_proc = play_audio_file(self.tmp_path)
-            self._update_status("▶ Playing...")
+            # Show CosyVoice indicator for Chinese voices
+            voice, _, _ = self._get_current_selection()
+            if voice.voice_id[0] == "z" and is_cosyvoice_available():
+                self._update_status("▶ Playing (CosyVoice)...")
+            else:
+                self._update_status("▶ Playing...")
             # Start polling for audio completion
             self.set_timer(0.5, self._check_audio_finished)
         elif event.state == WorkerState.ERROR:
@@ -451,7 +463,11 @@ class VoiceDemoApp(App):
         table = self.query_one("#voice-table", DataTable)
         table.move_cursor(row=row_idx)
 
-        self._update_status("Generating...")
+        # Show CosyVoice indicator for Chinese voices
+        if voice.voice_id[0] == "z" and is_cosyvoice_available():
+            self._update_status("Generating (CosyVoice)...")
+        else:
+            self._update_status("Generating...")
         self._generate_and_play(text, voice.voice_id, voice.lang_code)
 
     # -------------------------------------------------------------------------
