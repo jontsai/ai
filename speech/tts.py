@@ -214,8 +214,8 @@ def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, s
     Returns:
         Tuple of (samples, sample_rate) where samples is a numpy array.
     """
-    # Route Chinese voices to CosyVoice for higher quality
-    if voice and voice[0].lower() == "z" and _is_cosyvoice_available():
+    # Route CosyVoice-specific voice to CosyVoice backend
+    if voice and voice.startswith("cosyvoice_") and _is_cosyvoice_available():
         return _synthesize_cosyvoice(text, voice, speed)
 
     if TTS_BACKEND == "native":

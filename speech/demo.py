@@ -85,25 +85,37 @@ class Voice:
     """Voice definition with properties derived from voice_id."""
     voice_id: str
     notes: str = ""
+    # Override fields for non-standard voice IDs (like CosyVoice)
+    _name: str = ""
+    _gender: str = ""
+    _lang_code: str = ""
 
     @property
     def name(self) -> str:
         """Derive name from voice_id (e.g., 'af_heart' -> 'Heart')."""
+        if self._name:
+            return self._name
         return self.voice_id.split("_", 1)[1].title()
 
     @property
     def gender(self) -> str:
         """Derive gender from voice_id[1] ('f'=Female, 'm'=Male)."""
+        if self._gender:
+            return self._gender
         return "Female" if self.voice_id[1] == "f" else "Male"
 
     @property
     def lang_code(self) -> str:
         """Derive language code from voice_id[0]."""
+        if self._lang_code:
+            return self._lang_code
         return VOICE_LANG_META.get(self.voice_id[0], ("en-us", ""))[0]
 
     @property
     def nationality(self) -> str:
         """Derive nationality from voice_id[0]."""
+        if self._lang_code == "cmn":
+            return "Chinese"
         return VOICE_LANG_META.get(self.voice_id[0], ("en-us", ""))[1]
 
     @property
@@ -119,14 +131,14 @@ class Voice:
     @property
     def model(self) -> str:
         """Return the TTS model used for this voice."""
-        if self.voice_id[0] == "z" and is_cosyvoice_available():
+        if self.voice_id.startswith("cosyvoice_"):
             return "CosyVoice"
         return "Kokoro"
 
 
-def V(voice_id: str, notes: str = "") -> Voice:
+def V(voice_id: str, notes: str = "", name: str = "", gender: str = "", lang_code: str = "") -> Voice:
     """Shorthand for creating Voice instances."""
-    return Voice(voice_id, notes)
+    return Voice(voice_id, notes, name, gender, lang_code)
 
 
 # Voice definitions: (lang_name, lang_code, [Voice, ...])
@@ -172,6 +184,7 @@ LANGUAGES = [
         V("jm_kumo"),
     ]),
     ("Chinese", "cmn", [
+        V("cosyvoice_chinese", "high quality, slow", name="CosyVoice", gender="Female", lang_code="cmn"),
         V("zf_xiaobei"),
         V("zf_xiaoni"),
         V("zf_xiaoxiao"),
@@ -416,9 +429,9 @@ class VoiceDemoApp(App):
             self.tmp_path = event.worker.result
             stop_audio()
             self.audio_proc = play_audio_file(self.tmp_path)
-            # Show CosyVoice indicator for Chinese voices
+            # Show CosyVoice indicator
             voice, _, _ = self._get_current_selection()
-            if voice.voice_id[0] == "z" and is_cosyvoice_available():
+            if voice.voice_id.startswith("cosyvoice_"):
                 self._update_status("▶ Playing (CosyVoice)...")
             else:
                 self._update_status("▶ Playing...")
@@ -463,8 +476,8 @@ class VoiceDemoApp(App):
         table = self.query_one("#voice-table", DataTable)
         table.move_cursor(row=row_idx)
 
-        # Show CosyVoice indicator for Chinese voices
-        if voice.voice_id[0] == "z" and is_cosyvoice_available():
+        # Show CosyVoice indicator
+        if voice.voice_id.startswith("cosyvoice_"):
             self._update_status("Generating (CosyVoice)...")
         else:
             self._update_status("Generating...")
