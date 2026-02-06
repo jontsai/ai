@@ -237,6 +237,12 @@ LANGUAGES = [
           ref_audio="cosyvoice/asset/zero_shot_prompt.wav"),
         V("cosyvoice_jontsai_en", "custom clone", name="Jonathan", gender="Male", lang_code="en-us",
           ref_audio="samples/Jonathan_Tsai/en_psalm_23.wav"),
+        V("cosyvoice_pradnesh_en", "custom clone", name="Pradnesh", gender="Male", lang_code="en-us",
+          ref_audio="samples/Pradnesh_Patil/tech_demo.wav"),
+        V("cosyvoice_saurabh_en", "custom clone", name="Saurabh", gender="Male", lang_code="en-us",
+          ref_audio="samples/Saurabh_Arora/tech_demo.wav"),
+        V("cosyvoice_anand_en", "custom clone", name="Anand", gender="Male", lang_code="en-us",
+          ref_audio="samples/Anand_Gupta/tech_demo.wav"),
     ]),
 ]
 
