@@ -127,13 +127,16 @@ def _is_cosyvoice_daemon_running() -> bool:
         return False
 
 
-def _synthesize_cosyvoice_daemon(text: str, lang: str = "zh") -> tuple:
+def _synthesize_cosyvoice_daemon(text: str, lang: str = "zh", ref_audio: str = "") -> tuple:
     """Synthesize using the CosyVoice daemon (fast path)."""
     import urllib.request
     import json
 
     url = f"http://{_COSYVOICE_DAEMON_HOST}:{_COSYVOICE_DAEMON_PORT}/synthesize"
-    data = json.dumps({"text": text, "lang": lang}).encode("utf-8")
+    payload = {"text": text, "lang": lang}
+    if ref_audio:
+        payload["ref_audio"] = ref_audio
+    data = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=data,
@@ -141,7 +144,7 @@ def _synthesize_cosyvoice_daemon(text: str, lang: str = "zh") -> tuple:
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=30) as resp:
+    with urllib.request.urlopen(req, timeout=60) as resp:
         wav_bytes = resp.read()
 
     # Parse WAV bytes
@@ -150,11 +153,19 @@ def _synthesize_cosyvoice_daemon(text: str, lang: str = "zh") -> tuple:
     return np.asarray(samples, dtype=np.float32), sample_rate
 
 
-def _synthesize_cosyvoice_subprocess(text: str) -> tuple:
+def _synthesize_cosyvoice_subprocess(text: str, lang: str = "zh", ref_audio: str = "") -> tuple:
     """Synthesize using subprocess (slow path, loads model each time)."""
     # Create temp file for output
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         output_path = f.name
+
+    # Default reference audio if not specified
+    if not ref_audio:
+        ref_audio = str(_COSYVOICE_DIR / "asset" / "zero_shot_prompt.wav")
+
+    # Map language to tag
+    lang_tags = {"zh": "<|zh|>", "en": "<|en|>", "ja": "<|ja|>", "ko": "<|ko|>"}
+    lang_tag = lang_tags.get(lang, "<|zh|>")
 
     try:
         # Build the Python script to run in CosyVoice venv
@@ -166,10 +177,10 @@ import torchaudio
 
 cosyvoice = AutoModel(model_dir='pretrained_models/CosyVoice2-0.5B')
 
-# Add language tag for Chinese
-text = '<|zh|>' + {repr(text)}
+# Add language tag
+text = {repr(lang_tag)} + {repr(text)}
 
-for i, j in enumerate(cosyvoice.inference_cross_lingual(text, './asset/zero_shot_prompt.wav')):
+for i, j in enumerate(cosyvoice.inference_cross_lingual(text, {repr(ref_audio)})):
     torchaudio.save({repr(output_path)}, j['tts_speech'], cosyvoice.sample_rate)
     break
 '''
@@ -197,7 +208,7 @@ for i, j in enumerate(cosyvoice.inference_cross_lingual(text, './asset/zero_shot
             os.unlink(output_path)
 
 
-def _synthesize_cosyvoice(text: str, voice: str = "zh_female", speed: float = DEFAULT_SPEED):
+def _synthesize_cosyvoice(text: str, voice: str = "zh_female", speed: float = DEFAULT_SPEED, lang: str | None = None, ref_audio: str = ""):
     """
     Synthesize speech using CosyVoice (for Chinese).
 
@@ -208,12 +219,25 @@ def _synthesize_cosyvoice(text: str, voice: str = "zh_female", speed: float = DE
             "CosyVoice not set up. Run: make cosyvoice-setup"
         )
 
+    # Determine language from lang parameter or voice ID
+    if lang is None:
+        lang = "zh" if "_zh" in voice else "en"
+    # Map lang codes to CosyVoice format
+    lang_map = {"cmn": "zh", "en-us": "en", "en-gb": "en", "ja": "ja"}
+    lang = lang_map.get(lang, lang)
+
+    # Resolve ref_audio path (relative to speech/ directory)
+    if ref_audio:
+        ref_audio_path = str(_SCRIPT_DIR / ref_audio)
+    else:
+        ref_audio_path = str(_COSYVOICE_DIR / "asset" / "zero_shot_prompt.wav")
+
     # Try daemon first (fast path)
     if _is_cosyvoice_daemon_running():
-        return _synthesize_cosyvoice_daemon(text, lang="zh")
+        return _synthesize_cosyvoice_daemon(text, lang=lang, ref_audio=ref_audio_path)
 
     # Fall back to subprocess (slow path)
-    return _synthesize_cosyvoice_subprocess(text)
+    return _synthesize_cosyvoice_subprocess(text, lang=lang, ref_audio=ref_audio_path)
 
 
 # -----------------------------------------------------------------------------
@@ -250,7 +274,7 @@ def is_cosyvoice_available() -> bool:
     return _is_cosyvoice_available()
 
 
-def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, speed: float = DEFAULT_SPEED):
+def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, speed: float = DEFAULT_SPEED, ref_audio: str = ""):
     """
     Synthesize speech from text.
 
@@ -259,13 +283,14 @@ def synthesize(text: str, voice: str = DEFAULT_VOICE, lang: str | None = None, s
         voice: Voice ID (e.g., "af_heart", "zf_xiaobei").
         lang: Language code (e.g., "en-us", "zh"). Auto-detected from voice if None.
         speed: Speed multiplier (0.5 = half, 2.0 = double).
+        ref_audio: Reference audio path for CosyVoice cloning (relative to speech/).
 
     Returns:
         Tuple of (samples, sample_rate) where samples is a numpy array.
     """
     # Route CosyVoice-specific voice to CosyVoice backend
     if voice and voice.startswith("cosyvoice_") and _is_cosyvoice_available():
-        return _synthesize_cosyvoice(text, voice, speed)
+        return _synthesize_cosyvoice(text, voice, speed, lang, ref_audio)
 
     if TTS_BACKEND == "native":
         return _synthesize_native(text, voice, lang, speed)

@@ -39,6 +39,7 @@ shutdown_event = threading.Event()
 class SynthesizeRequest(BaseModel):
     text: str
     lang: str = "zh"  # zh, en, ja, ko
+    ref_audio: str = ""  # Path to reference audio for voice cloning
 
 
 def load_model():
@@ -108,10 +109,13 @@ async def synthesize(request: SynthesizeRequest):
         lang_tags = {"zh": "<|zh|>", "en": "<|en|>", "ja": "<|ja|>", "ko": "<|ko|>"}
         tagged_text = lang_tags.get(request.lang, "<|zh|>") + request.text
 
+        # Use provided ref_audio or default
+        ref_audio_path = request.ref_audio if request.ref_audio else "./asset/zero_shot_prompt.wav"
+
         # Generate audio
         audio_data = None
         for _, result in enumerate(
-            model.inference_cross_lingual(tagged_text, "./asset/zero_shot_prompt.wav")
+            model.inference_cross_lingual(tagged_text, ref_audio_path)
         ):
             audio_data = result["tts_speech"]
             break

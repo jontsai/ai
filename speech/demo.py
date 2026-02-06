@@ -89,6 +89,7 @@ class Voice:
     _name: str = ""
     _gender: str = ""
     _lang_code: str = ""
+    _ref_audio: str = ""  # Reference audio path for CosyVoice cloning
 
     @property
     def name(self) -> str:
@@ -138,10 +139,15 @@ class Voice:
             return "CosyVoice"
         return "Kokoro"
 
+    @property
+    def ref_audio(self) -> str:
+        """Return the reference audio path for CosyVoice cloning."""
+        return self._ref_audio
 
-def V(voice_id: str, notes: str = "", name: str = "", gender: str = "", lang_code: str = "") -> Voice:
+
+def V(voice_id: str, notes: str = "", name: str = "", gender: str = "", lang_code: str = "", ref_audio: str = "") -> Voice:
     """Shorthand for creating Voice instances."""
-    return Voice(voice_id, notes, name, gender, lang_code)
+    return Voice(voice_id, notes, name, gender, lang_code, ref_audio)
 
 
 # Voice definitions: (lang_name, lang_code, [Voice, ...])
@@ -220,6 +226,18 @@ LANGUAGES = [
         V("pm_alex"),
         V("pm_santa"),
     ]),
+    ("Sampled Voices - Chinese", "cmn", [
+        V("cosyvoice_default_zh", "default female", name="Default", gender="Female", lang_code="cmn",
+          ref_audio="cosyvoice/asset/zero_shot_prompt.wav"),
+        V("cosyvoice_jontsai_zh", "custom clone", name="Jonathan", gender="Male", lang_code="cmn",
+          ref_audio="samples/Jonathan_Tsai/zh_psalm_23.wav"),
+    ]),
+    ("Sampled Voices - English", "en-us", [
+        V("cosyvoice_default_en", "default female", name="Default", gender="Female", lang_code="en-us",
+          ref_audio="cosyvoice/asset/zero_shot_prompt.wav"),
+        V("cosyvoice_jontsai_en", "custom clone", name="Jonathan", gender="Male", lang_code="en-us",
+          ref_audio="samples/Jonathan_Tsai/en_psalm_23.wav"),
+    ]),
 ]
 
 
@@ -241,12 +259,12 @@ def play_audio_file(wav_path: str) -> subprocess.Popen:
     )
 
 
-def generate_audio(text: str, voice_id: str, lang_code: str) -> str:
+def generate_audio(text: str, voice_id: str, lang_code: str, ref_audio: str = "") -> str:
     """Generate TTS audio and return temp file path."""
     import tts
 
     # Use the lang_code directly - tts.py handles espeak-ng codes
-    samples, sample_rate = tts.synthesize(text, voice=voice_id, lang=lang_code)
+    samples, sample_rate = tts.synthesize(text, voice=voice_id, lang=lang_code, ref_audio=ref_audio)
 
     fd, tmp_path = tempfile.mkstemp(suffix='.wav')
     os.close(fd)
@@ -422,9 +440,9 @@ class VoiceDemoApp(App):
             self.tmp_path = None
 
     @work(exclusive=True, thread=True)
-    def _generate_and_play(self, text: str, voice_id: str, lang_code: str) -> str:
+    def _generate_and_play(self, text: str, voice_id: str, lang_code: str, ref_audio: str = "") -> str:
         """Generate audio in background thread."""
-        return generate_audio(text, voice_id, lang_code)
+        return generate_audio(text, voice_id, lang_code, ref_audio)
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
         """Handle audio generation completion."""
@@ -484,7 +502,7 @@ class VoiceDemoApp(App):
             self._update_status("Generating (CosyVoice)...")
         else:
             self._update_status("Generating...")
-        self._generate_and_play(text, voice.voice_id, voice.lang_code)
+        self._generate_and_play(text, voice.voice_id, voice.lang_code, voice.ref_audio)
 
     # -------------------------------------------------------------------------
     # Event Handlers
