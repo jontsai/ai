@@ -33,6 +33,9 @@ help:
 	@echo "  make cosyvoice-install   Install dependencies only"
 	@echo "  make cosyvoice-model     Download pretrained model"
 	@echo "  make cosyvoice-say       TTS with CosyVoice (TEXT=, VOICE=)"
+	@echo "  make cosyvoice-daemon-start   Start persistent daemon (fast TTS)"
+	@echo "  make cosyvoice-daemon-stop    Stop daemon"
+	@echo "  make cosyvoice-daemon-status  Check daemon status"
 	@echo
 	@echo "Model sets: minimal | fallback | default | all"
 	@echo "Voices: see speech/voices/README.md (54 voices, 9 languages)"
@@ -208,3 +211,15 @@ cosyvoice-model:
 cosyvoice-say:
 	@# TTS with CosyVoice: make cosyvoice-say TEXT="你好" VOICE="中文女"
 	@./scripts/cosyvoice-say.sh "$(TEXT)" "$(VOICE)"
+
+cosyvoice-daemon-start:
+	@./scripts/cosyvoice-daemon.sh start
+
+cosyvoice-daemon-stop:
+	@./scripts/cosyvoice-daemon.sh stop
+
+cosyvoice-daemon-status:
+	@./scripts/cosyvoice-daemon.sh status
+
+cosyvoice-daemon-logs:
+	@./scripts/cosyvoice-daemon.sh logs

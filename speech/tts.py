@@ -105,23 +105,53 @@ _COSYVOICE_DIR = _SCRIPT_DIR / "cosyvoice"
 _COSYVOICE_VENV = _COSYVOICE_DIR / ".venv"
 _COSYVOICE_MODEL = _COSYVOICE_DIR / "pretrained_models" / "CosyVoice2-0.5B"
 
+# Daemon settings
+_COSYVOICE_DAEMON_HOST = os.environ.get("COSYVOICE_HOST", "127.0.0.1")
+_COSYVOICE_DAEMON_PORT = int(os.environ.get("COSYVOICE_PORT", "8765"))
+
 
 def _is_cosyvoice_available() -> bool:
     """Check if CosyVoice is set up and ready."""
     return _COSYVOICE_VENV.exists() and _COSYVOICE_MODEL.exists()
 
 
-def _synthesize_cosyvoice(text: str, voice: str = "zh_female", speed: float = DEFAULT_SPEED):
-    """
-    Synthesize speech using CosyVoice (for Chinese).
+def _is_cosyvoice_daemon_running() -> bool:
+    """Check if the CosyVoice daemon is running."""
+    import urllib.request
+    import urllib.error
+    try:
+        url = f"http://{_COSYVOICE_DAEMON_HOST}:{_COSYVOICE_DAEMON_PORT}/health"
+        with urllib.request.urlopen(url, timeout=1) as resp:
+            return resp.status == 200
+    except (urllib.error.URLError, OSError):
+        return False
 
-    Runs CosyVoice in its separate Python 3.10 venv via subprocess.
-    """
-    if not _is_cosyvoice_available():
-        raise FileNotFoundError(
-            "CosyVoice not set up. Run: make cosyvoice-setup"
-        )
 
+def _synthesize_cosyvoice_daemon(text: str, lang: str = "zh") -> tuple:
+    """Synthesize using the CosyVoice daemon (fast path)."""
+    import urllib.request
+    import json
+
+    url = f"http://{_COSYVOICE_DAEMON_HOST}:{_COSYVOICE_DAEMON_PORT}/synthesize"
+    data = json.dumps({"text": text, "lang": lang}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        wav_bytes = resp.read()
+
+    # Parse WAV bytes
+    import io
+    samples, sample_rate = sf.read(io.BytesIO(wav_bytes))
+    return np.asarray(samples, dtype=np.float32), sample_rate
+
+
+def _synthesize_cosyvoice_subprocess(text: str) -> tuple:
+    """Synthesize using subprocess (slow path, loads model each time)."""
     # Create temp file for output
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
         output_path = f.name
@@ -165,6 +195,25 @@ for i, j in enumerate(cosyvoice.inference_cross_lingual(text, './asset/zero_shot
         # Clean up temp file
         if os.path.exists(output_path):
             os.unlink(output_path)
+
+
+def _synthesize_cosyvoice(text: str, voice: str = "zh_female", speed: float = DEFAULT_SPEED):
+    """
+    Synthesize speech using CosyVoice (for Chinese).
+
+    Tries daemon first (fast), falls back to subprocess (slow).
+    """
+    if not _is_cosyvoice_available():
+        raise FileNotFoundError(
+            "CosyVoice not set up. Run: make cosyvoice-setup"
+        )
+
+    # Try daemon first (fast path)
+    if _is_cosyvoice_daemon_running():
+        return _synthesize_cosyvoice_daemon(text, lang="zh")
+
+    # Fall back to subprocess (slow path)
+    return _synthesize_cosyvoice_subprocess(text)
 
 
 # -----------------------------------------------------------------------------

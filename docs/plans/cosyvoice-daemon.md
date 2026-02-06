@@ -72,11 +72,11 @@ cosyvoice-daemon-status: # Check daemon status
 
 ### Implementation Steps
 
-1. [ ] Create `scripts/cosyvoice-daemon.py` with FastAPI server
-2. [ ] Create `scripts/cosyvoice-daemon.sh` for process management
-3. [ ] Update `tts.py` to use daemon when available
-4. [ ] Add Makefile targets
-5. [ ] Add idle timeout auto-shutdown
+1. [x] Create `scripts/cosyvoice-daemon.py` with FastAPI server
+2. [x] Create `scripts/cosyvoice-daemon.sh` for process management
+3. [x] Update `tts.py` to use daemon when available
+4. [x] Add Makefile targets
+5. [x] Add idle timeout auto-shutdown
 6. [ ] Test integration with voice-demo
 
 ### Future Enhancements
