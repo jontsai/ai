@@ -501,9 +501,8 @@ class VoiceDemoApp(App):
             # Update text input with language-appropriate greeting
             _, _, voices = LANGUAGES[self.lang_idx]
             if voices:
-                lang_prefix = voices[0].voice_id[0]
                 text_input = self.query_one("#text-input", Input)
-                text_input.value = get_greeting_for_lang(lang_prefix)
+                text_input.value = voices[0].greeting
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         """Handle voice selection (Enter key on table)."""
@@ -520,8 +519,7 @@ class VoiceDemoApp(App):
         if event.input.id == "text-input" and event.value == "":
             _, _, voices = LANGUAGES[self.lang_idx]
             if voices:
-                lang_prefix = voices[0].voice_id[0]
-                event.input.value = get_greeting_for_lang(lang_prefix)
+                event.input.value = voices[0].greeting
             else:
                 event.input.value = DEFAULT_TEXT
 
