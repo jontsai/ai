@@ -40,6 +40,7 @@ class SynthesizeRequest(BaseModel):
     text: str
     lang: str = "zh"  # zh, en, ja, ko
     ref_audio: str = ""  # Path to reference audio for voice cloning
+    instruct: str = ""  # Instruction for accent/dialect/emotion (e.g., "Speak with Indian accent")
 
 
 def load_model():
@@ -112,13 +113,25 @@ async def synthesize(request: SynthesizeRequest):
         # Use provided ref_audio or default
         ref_audio_path = request.ref_audio if request.ref_audio else "./asset/zero_shot_prompt.wav"
 
-        # Generate audio
+        # Generate audio - use instruct mode if instruction provided
         audio_data = None
-        for _, result in enumerate(
-            model.inference_cross_lingual(tagged_text, ref_audio_path)
-        ):
-            audio_data = result["tts_speech"]
-            break
+        if request.instruct:
+            # Ensure instruction ends with prompt marker
+            instruct_text = request.instruct
+            if not instruct_text.endswith("<|endofprompt|>"):
+                instruct_text = instruct_text + "<|endofprompt|>"
+
+            for _, result in enumerate(
+                model.inference_instruct2(tagged_text, instruct_text, ref_audio_path)
+            ):
+                audio_data = result["tts_speech"]
+                break
+        else:
+            for _, result in enumerate(
+                model.inference_cross_lingual(tagged_text, ref_audio_path)
+            ):
+                audio_data = result["tts_speech"]
+                break
 
         if audio_data is None:
             return JSONResponse({"error": "No audio generated"}, status_code=500)
