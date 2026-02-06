@@ -226,13 +226,13 @@ LANGUAGES = [
         V("pm_alex"),
         V("pm_santa"),
     ]),
-    ("Sampled Voices - Chinese", "cmn", [
+    ("CosyVoice - Chinese", "cmn", [
         V("cosyvoice_default_zh", "default female", name="Default", gender="Female", lang_code="cmn",
           ref_audio="cosyvoice/asset/zero_shot_prompt.wav"),
         V("cosyvoice_jontsai_zh", "custom clone", name="Jonathan", gender="Male", lang_code="cmn",
           ref_audio="samples/Jonathan_Tsai/zh_psalm_23.wav"),
     ]),
-    ("Sampled Voices - English", "en-us", [
+    ("CosyVoice - English", "en-us", [
         V("cosyvoice_default_en", "default female", name="Default", gender="Female", lang_code="en-us",
           ref_audio="cosyvoice/asset/zero_shot_prompt.wav"),
         V("cosyvoice_jontsai_en", "custom clone", name="Jonathan", gender="Male", lang_code="en-us",
