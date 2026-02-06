@@ -126,6 +126,9 @@ class Voice:
     @property
     def greeting(self) -> str:
         """Get the language-appropriate greeting template."""
+        # For CosyVoice, use 'z' prefix for Chinese greeting
+        if self._lang_code == "cmn":
+            return get_greeting_for_lang("z")
         return get_greeting_for_lang(self.voice_id[0])
 
     @property
